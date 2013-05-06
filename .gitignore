@@ -36,3 +36,4 @@ nosetests.xml
 extract_valid_evtx_records_and_templates.py~
 find_evtx_chunks.py~
 *~
+tests/*
