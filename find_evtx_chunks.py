@@ -17,11 +17,13 @@
 #   limitations under the License.
 #
 #   Version v0.1
+import logging
 import mmap
 import contextlib
 import struct
 
 from Evtx.Evtx import ChunkHeader
+from Evtx.BinaryParser import OverrunBufferException
 
 
 def offset_seems_like_chunk_header(buf, offset):
@@ -32,10 +34,19 @@ def offset_seems_like_chunk_header(buf, offset):
     @type offset: int
     @rtype boolean
     """
-    if struct.unpack_from(buf, "<8s", offset) != "ElfChnk":
+    logger = logging.getLogger("find_evtx_chunks")
+    logger.debug("Checking for a chunk at %s", hex(offset))
+    try:
+        if struct.unpack_from("<7s", buf, offset)[0] != "ElfChnk":
+            logger.debug("Bad magic")
+            return False
+        if not (0x80 <= struct.unpack_from("<I", buf, offset + 0x28)[0] <= 0x200):
+            logger.debug("Bad size")
+            return False
+    except OverrunBufferException:
+        logger.debug("Bad buffer size")
         return False
-    if not (0x80 <= struct.unpack_from(buf, "<I", offset + 0x28) <= 0x200):
-        return False
+    logger.debug("Looks good")
     return True
 
 
@@ -46,6 +57,7 @@ class CHUNK_HIT_TYPE:
     CHUNK_VALID = 0
     CHUNK_BAD_HEADER = 1
     CHUNK_BAD_DATA = 2
+    CHUNK_BAD_SIZE = 3
 
 
 def find_evtx_chunks(buf):
@@ -55,6 +67,7 @@ def find_evtx_chunks(buf):
     @type buf: bytestring
     @rtype: generator of (int, int)
     """
+    logger = logging.getLogger("find_evtx_chunks")
     index = buf.find("ElfChnk")
     while index != -1:
         if not offset_seems_like_chunk_header(buf, index):
@@ -62,23 +75,30 @@ def find_evtx_chunks(buf):
             continue
         chunk = ChunkHeader(buf, index)
 
-        if chunk.calculate_header_checksum() != chunk.header_checksum():
+        if len(buf) - index < 0x10000:
+            logger.debug("Bad size")
+            yield (CHUNK_HIT_TYPE.CHUNK_BAD_SIZE, index)
+        elif chunk.calculate_header_checksum() != chunk.header_checksum():
             yield (CHUNK_HIT_TYPE.CHUNK_BAD_HEADER, index)
-        if chunk.calculate_data_checksum() != chunk.data_checksum():
+        elif chunk.calculate_data_checksum() != chunk.data_checksum():
             yield (CHUNK_HIT_TYPE.CHUNK_BAD_DATA, index)
         else:
             yield (CHUNK_HIT_TYPE.CHUNK_VALID, index)
         index = buf.find("ElfChnk", index + 1)
-        continue
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(
         description="Find offsets of EVTX chunk headers.")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable debug logging.")
     parser.add_argument("evtx", type=str,
                         help="Path to the Windows EVTX file")
     args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
     with open(args.evtx, "rb") as f:
         with contextlib.closing(mmap.mmap(f.fileno(), 0,
@@ -88,6 +108,8 @@ def main():
                     print("%s\t%s" % ("CHUNK_BAD_HEADER", hex(offset)))
                 elif hit_type == CHUNK_HIT_TYPE.CHUNK_BAD_DATA:
                     print("%s\t%s" % ("CHUNK_BAD_DATA", hex(offset)))
+                elif hit_type == CHUNK_HIT_TYPE.CHUNK_BAD_SIZE:
+                    print("%s\t%s" % ("CHUNK_BAD_SIZE", hex(offset)))
                 elif hit_type == CHUNK_HIT_TYPE.CHUNK_VALID:
                     print("%s\t%s" % ("CHUNK_VALID", hex(offset)))
                 else:
