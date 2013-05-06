@@ -12,7 +12,7 @@ To decode a record into XML, the event log service resolves the template and rep
 Therefore, template corruption renders many records unrecoverable within the local 64KB "chunk".
 However, the substitution array for the remaining records may still be intact.
 If so, it may be possible to produce XML fragments that match the original records if the damaged template can be reconstructed.
-For many common events, such as process creation or account logon, empirical testing demonstrates the relevant templates remain constant.
+For many common events, such as process creation or account logon, empirical testing demonstrates the relevant templates remain mostly constant.
 In these cases, recovering event log records boils down to identifying appropriate templates found in other EVTX chunks.
 
 

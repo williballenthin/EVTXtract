@@ -17,6 +17,8 @@
 #   limitations under the License.
 #
 #   Version v0.1
+import sys
+import re
 import logging
 import mmap
 import contextlib
@@ -25,6 +27,7 @@ import contextlib
 from lxml import etree
 from Evtx.Evtx import ChunkHeader
 from Evtx.Nodes import BXmlTypeNode
+from Evtx.Nodes import TemplateInstanceNode
 
 
 def to_lxml(record):
@@ -83,6 +86,60 @@ def merge_template(templates, eid, offset, template):
         templates[eid] = [(offset, template)]
 
 
+def make_replacement(template, index, substitution):
+    """
+    Makes a substitution given a template as a string.
+
+    Implementation is a huge hack that depends on the
+      brittle template_format() output.
+
+    @type template: str
+    @type index: int
+    @type substitution: str
+    @rtype: str
+    """
+    from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
+    return re.sub(from_pattern, substitution, template)
+
+
+def get_complete_template(root, current_index=0):
+    """
+    Gets the template from a RootNode while resolving any
+      nested templates and fixing up their indices.
+    Depth first ordering/indexing.
+
+    Implementation is a huge hack that depends on the
+      brittle template_format() output.
+
+    @type root: RootNode
+    @type current_index: int
+    @rtype: str
+    """
+    template = root.template_format()
+    replacements = []
+    for index, substitution in enumerate(root.substitutions()):
+        # find all sub-templates
+        if not isinstance(substitution, BXmlTypeNode):
+            replacements.append(current_index + index)
+            continue
+        subtemplate = get_complete_template(substitution._root,
+                                            current_index=current_index + index)
+        replacements.append(subtemplate)
+        current_index += subtemplate.count("Substitution(index=")
+    replacements.reverse()
+    for i, replacement in enumerate(replacements):
+        index = len(replacements) - i - 1
+        if isinstance(replacement, int):
+            # fixup index
+            from_pattern = "index=%d," % index
+            to_pattern = "index=%d," % replacement
+            template = template.replace(from_pattern, to_pattern)
+        if isinstance(replacement, basestring):
+            # insert sub-template
+            template = make_replacement(template, index, replacement)
+    return template
+
+
 def extract_chunk(buf, offset):
     """
     Parse an EVTX chunk into the XML entries and a dict of templates.
@@ -99,8 +156,8 @@ def extract_chunk(buf, offset):
     templates = {}
     for record in chunk.records():
         try:
-            template = record.root().template_format()
             eid = get_eid(record)
+            template = get_complete_template(record.root())
             merge_template(templates, eid, record.offset(), template)
             xml.append(record.root().xml([]).encode("utf-8"))
         except UnicodeEncodeError:
