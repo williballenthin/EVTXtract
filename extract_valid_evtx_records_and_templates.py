@@ -17,7 +17,6 @@
 #   limitations under the License.
 #
 #   Version v0.1
-import sys
 import re
 import logging
 import mmap
@@ -27,7 +26,6 @@ import contextlib
 from lxml import etree
 from Evtx.Evtx import ChunkHeader
 from Evtx.Nodes import BXmlTypeNode
-from Evtx.Nodes import TemplateInstanceNode
 
 
 def to_lxml(record):
@@ -189,8 +187,9 @@ def main():
     args = parser.parse_args()
 
     if args.verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    
+        logging.basicConfig(level=logging.DEBUG,
+                            format="%(asctime)s %(levelname)s %(name)s %(message)s")
+
     logger = logging.getLogger("extract_records")
 
     with open(args.evtx, "rb") as f:
