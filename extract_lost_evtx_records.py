@@ -367,14 +367,14 @@ def format_record(record):
             val_str = value.isoformat("T") + "Z"
         else:
             val_str = str(value)
-        ret.append("substitition-%i (%s): %s" % (i, hex(type_), val_str))
+        ret.append("substitution-%i (%s): %s" % (i, hex(type_), val_str))
     return "\n".join(ret)
 
 
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="Extract lost EVTX records..")
+        description="Extract lost EVTX records.")
     parser.add_argument("--verbose", action="store_true",
                         help="Enable debugging output")
     parser.add_argument("evtx", type=str,
@@ -386,10 +386,12 @@ def main():
 
     if args.verbose:
         logging.basicConfig(level=logging.DEBUG,
-                            format="%(asctime)s %(levelname)s %(name)s %(message)s")
+                            format="# %(asctime)s %(levelname)s %(name)s %(message)s")
 
     logger = logging.getLogger("extract_lost_records")
 
+    num_extracted = 0
+    num_failures = 0
     with open(args.evtx, "rb") as f:
         with contextlib.closing(mmap.mmap(f.fileno(), 0,
                                           access=mmap.ACCESS_READ)) as buf:
@@ -401,12 +403,18 @@ def main():
                         logging.debug("Skipping, cause its not a lost record")
                         continue
                     offset = int(offset, 0x10)
-                    record = extract_lost_record(buf, offset)
                     try:
+                        record = extract_lost_record(buf, offset)
                         print format_record(record)
-                    except IndexError:
-                        print record
-                        return
+                        print "\n"
+                        num_extracted += 1
+                    except Exception:
+                        logging.warning("Exception encountered processing lost record at %s", hex(offset), exc_info=True)
+                        num_failures += 1
+
+    print("# Number of extracted records: %d" % num_extracted)
+    print("# Number of failed record extractions: %d" % num_failures)
+
 
 
 
