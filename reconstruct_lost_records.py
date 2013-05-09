@@ -91,11 +91,15 @@ def main():
         fixed.write("<Events>")
         with open(args.unreconstructed_outfile, "wb") as unfixed:
             for record_txt in records_txt.split("RECORD\n"):
-                if record_txt == "":
+                if record_txt == "" or "EID" not in record_txt:
                     continue
 
                 record_lines = record_txt.split("\n")
-                eid_line = record_lines[3]
+                try:
+                    eid_line = record_lines[3]
+                except:
+                    print ">>" + record_txt + "<<"
+                    return 
 
                 _, __, eid = eid_line.partition(": ")
                 eid = int(eid)
