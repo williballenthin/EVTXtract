@@ -31,13 +31,20 @@ valid_substitution_types[33] = True
 valid_substitution_types[129] = True
 
 
-def root_has_resident_template(buf, offset):
+class MaxOffsetReached(Exception):
+    def __init__(self, value):
+        super(MaxOffsetReached, self).__init__(value)
+
+
+def root_has_resident_template(buf, offset, max_offset):
     """
     Guess whether an RootNode has a resident template
-      from the given buffer and offset.
+      from the given buffer and offset, not parsing
+      beyond the given max_offset.
 
     @type buf: bytestring
     @type offset: int
+    @type max_offset: int
     @rtype: boolean
     """
     logger = logging.getLogger("extract_lost_records")
@@ -77,6 +84,9 @@ def root_has_resident_template(buf, offset):
         logger.debug("More than 100 subs, resident template")
         return True
     ofs += 4  # template_id or size
+
+    if max_offset < ofs + 4 + (4 * min(maybe_num_subs or 2, 4)):
+        return False
     for i in xrange(min(maybe_num_subs or 2, 4)):
         byte = struct.unpack_from("<B", buf, ofs + 3 + (i * 4))[0]
         if byte != 0:
@@ -91,12 +101,14 @@ def root_has_resident_template(buf, offset):
     return False
 
 
-def extract_root_substitutions(buf, offset):
+def extract_root_substitutions(buf, offset, max_offset):
     """
-    Parse a RootNode into a list of its substitutions.
+    Parse a RootNode into a list of its substitutions, not parsing beyond
+      the max offset.
 
     @type buf: bytestring
     @type offset: int
+    @type max_offset: int
     @rtype: list of (int, str)
     """
     logger = logging.getLogger("extract_lost_records")
@@ -109,7 +121,7 @@ def extract_root_substitutions(buf, offset):
 
     ofs += 6  # template offset
 
-    if root_has_resident_template(buf, offset):
+    if root_has_resident_template(buf, offset, max_offset):
         # have to hope that the template begins immediately
         # template_offset = struct.unpack_from("<I", buf, ofs)[0]
         logger.debug("resident template")
@@ -125,7 +137,8 @@ def extract_root_substitutions(buf, offset):
 
     num_subs = struct.unpack_from("<I", buf, ofs)[0]
     if num_subs > 100:
-        raise Exception("Unexpected number of substitutions: %d" % num_subs)
+        raise Exception("Unexpected number of substitutions: %d at %s" % 
+                        (num_subs, hex(ofs)))
     ofs += 4  # begin sub list
     logger.debug("There are %d substitutions", num_subs)
 
@@ -140,6 +153,8 @@ def extract_root_substitutions(buf, offset):
     ret = []
     for i, pair in enumerate(substitutions):
         type_, size = pair
+        if ofs > max_offset:
+            raise MaxOffsetReached("Substitutions overran record buffer.")
         logger.debug("[%d/%d] substitution type %s at %s length %s", 
                      i + 1, num_subs, hex(type_), hex(ofs), hex(size))
         value = None
@@ -283,7 +298,7 @@ def extract_root_substitutions(buf, offset):
             logger.debug("Value: %s", value)
         #[33] = parse_bxml_type_node,  -- BXmlTypeNode, 0x21
         elif type_ == 0x21:
-            subs = extract_root_substitutions(buf, ofs)
+            subs = extract_root_substitutions(buf, ofs, max_offset)
             ret.extend(subs)
         #[129] = TODO, -- WstringArrayTypeNode, 0x81
         elif type_ == 0x81:
@@ -315,12 +330,13 @@ def extract_lost_record(buf, offset):
     @rtype: dict
     """
     logger = logging.getLogger("extract_lost_records")
-    logger.debug("Extracting lost node at %s", hex(offset))
-    record_num = struct.unpack_from("<I", buf, offset + 0x8)[0]
-    qword = struct.unpack_from("<Q", buf, offset + 0x10)[0]
+    record_size, record_num, qword = struct.unpack_from("<IQQ", buf, offset + 0x4)
     timestamp = datetime.utcfromtimestamp(float(qword) * 1e-7 - 11644473600)
+    logger.debug("Extracting lost node at %s, num %s, time %se",
+                 hex(offset), hex(record_num), timestamp.isoformat("T") + "Z")
     root_offset = offset + 0x18
-    substitutions = extract_root_substitutions(buf, root_offset)
+    substitutions = extract_root_substitutions(buf, root_offset, 
+                                               offset + record_size)
     return {
         "offset": offset,
         "record_num": record_num,
