@@ -114,7 +114,7 @@ def main():
         with contextlib.closing(mmap.mmap(f.fileno(), 0,
                                           access=mmap.ACCESS_READ)) as buf:
             for offset in find_lost_evtx_records(buf, ranges):
-                print("%s" % hex(offset))
+                print("%s\t%s" % ("LOST_RECORD", hex(offset)))
 
 
 if __name__ == "__main__":
