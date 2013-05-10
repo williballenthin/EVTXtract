@@ -167,7 +167,7 @@ def extract_chunk(buf, offset):
                             hex(record.offset()))
             continue
         except Exception as e:
-            logger.info("Unknown exception processing record at %s: %s" % (hex(record.offset(), str(e)))
+            logger.info("Unknown exception processing record at %s: %s" % (hex(record.offset(), str(e))))
             continue
     return "\n".join(xml), templates
 
