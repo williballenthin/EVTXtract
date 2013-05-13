@@ -55,6 +55,9 @@ class Template(object):
         self._xml = xml
         self._offset = offset
 
+    def get_xml(self):
+        return self._xml
+
     def get_eid(self):
         return self._eid
 
@@ -73,7 +76,7 @@ class Template(object):
             if "index=" not in part or "type=" not in part:
                 continue
             index = int(part.partition("=")[2].partition(",")[0])
-            type_ = int(part.partition("type=")[2].partition(",")[0])
+            type_ = int(part.partition("type=")[2].partition(")")[0])
             ret.append((index, type_))
         return sorted(ret, key=lambda p: p[0])
 
