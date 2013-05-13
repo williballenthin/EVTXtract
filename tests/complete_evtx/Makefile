@@ -1,5 +1,5 @@
 FIND_EVTX = "../../find_evtx_chunks.py"
-EXTRACT_TEMPLATES = "../../extract_valid_records_and_templates.py"
+EXTRACT_TEMPLATES = "../../extract_valid_evtx_records_and_templates.py"
 FIND_RECORDS = "../../find_evtx_records.py"
 EXTRACT_LOST_RECORDS = "../../extract_lost_evtx_records.py"
 CHUNK_LIST = "./chunk_list.txt"
@@ -19,8 +19,8 @@ test_extract_templates:
 	@echo "-- Testing extract_valid_templates_and_records --"
 	@python $(FIND_EVTX) $(TESTFILE) > $(CHUNK_LIST)
 	@python $(EXTRACT_TEMPLATES) $(TESTFILE) $(CHUNK_LIST) --records_outfile=records.xml --templates_outfile=templates.txt
-	@if [ cat "records.xml" | grep -a "<Event>" | wc -l) -eq 1 ]; then echo "PASS"; else echo "FAIL"; fi
-	@if [ cat "templates.txt" | grep -a "TEMPLATE" | wc -l) -eq 1 ]; then echo "PASS"; else echo "FAIL"; fi
+	@if [ $$(cat "records.xml" | grep -a "<Event " | wc -l) -eq 847 ]; then echo "PASS"; else echo "FAIL"; fi
+	@if [ $$(cat "templates.txt" | grep -a "TEMPLATE" | wc -l) -eq 38 ]; then echo "PASS"; else echo "FAIL"; fi
 
 .PHONY: test_find_records
 test_find_records:
