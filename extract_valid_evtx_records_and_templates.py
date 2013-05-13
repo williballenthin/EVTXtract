@@ -99,6 +99,11 @@ class Template(object):
         return ret
 
 
+class TemplateEIDConflictError(Exception):
+    def __init__(self, value):
+        super(TemplateEIDConflictError, self).__init__(value)
+
+
 class TemplateDatabase(object):
     def __init__(self):
         # @type self._templates: {str: [Template]}
@@ -133,6 +138,29 @@ class TemplateDatabase(object):
                 ret.append("OFFSET: %s\n" % template.get_offset())
                 ret.append("%s\n\n\n" % template.get_xml())
         return "\n".join(ret)
+
+    def deserialize(self, txt, warn_on_conflict=True):
+        """
+        Load a serialized TemplateDatabase into this one.
+
+        Overwrites whats current in this database.
+
+        @type txt: str
+        @rtype: None
+        @raises: TemplateEIDConflictError
+        """
+        self._templates = {}
+        for template_txt in txt.split("TEMPLATE\n"):
+            if template_txt == "":
+                continue
+            template_lines = template_txt.split("\n")
+            id_line = template_lines[0]
+            _, __, id_ = id_line.partition(": ")
+            template = "\n".join(template_lines[4:])
+            if id_ in self._templates and warn_on_conflict:
+                raise TemplateEIDConflictError("More than one template with ID %d" % id_)
+            # TODO(wb): parse out rest of template
+            self._templates[id_] = template
 
 
 def get_template(record):

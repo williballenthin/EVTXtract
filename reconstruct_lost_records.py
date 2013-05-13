@@ -22,35 +22,6 @@ import logging
 from extract_valid_evtx_records_and_templates import make_replacement
 
 
-class TemplateEIDConflictError(Exception):
-    def __init__(self, value):
-        super(TemplateEIDConflictError, self).__init__(value)
-
-
-def load_templates(templates_txt):
-    """
-    Parse a string of templates into a dictionary mapping EIDs to their
-      templates
-
-    @type templates_txt: str
-    @rtype: dict
-    @raises: TemplateEIDConflictError
-    """
-    templates = {}
-    for template_txt in templates_txt.split("TEMPLATE\n"):
-        if template_txt == "":
-            continue
-        template_lines = template_txt.split("\n")
-        eid_line = template_lines[0]
-        _, __, eid = eid_line.partition(": ")
-        eid = int(eid)
-        template = "\n".join(template_lines[3:])
-        if eid in templates:
-            raise TemplateEIDConflictError("More than one template with EID %d" % eid)
-        templates[eid] = template
-    return templates
-
-
 def main():
     import argparse
     parser = argparse.ArgumentParser(
