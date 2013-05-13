@@ -368,7 +368,7 @@ def format_record(record):
         else:
             val_str = str(value)
         ret.append("substitution-%i (%s): %s" % (i, hex(type_), val_str))
-    return "\n".join(ret)
+    return u"\n".join(ret)
 
 
 def main():
