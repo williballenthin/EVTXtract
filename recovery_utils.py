@@ -55,6 +55,9 @@ class Template(object):
         self._xml = xml
         self._offset = offset
 
+        self._cached_placeholders = None
+        self._cached_id = None
+
     def get_xml(self):
         return self._xml
 
@@ -62,6 +65,8 @@ class Template(object):
         return self._eid
 
     def get_id(self):
+        if self._cached_id is not None:
+            return self._cached_id
         ret = ["%s" % self._eid]
         for index, type_, mode in self._get_placeholders():
             if mode:
@@ -69,7 +74,8 @@ class Template(object):
             else:
                 mode_str = "n"
             ret.append("[%s|%s|%s]" % (index, type_, mode_str))
-        return "-".join(ret)
+        self._cached_id = "-".join(ret)
+        return self._cached_id
 
     def get_offset(self):
         return self._offset
@@ -83,10 +89,13 @@ class Template(object):
 
         @rtype: list of (int, int, boolean)
         """
+        if self._cached_placeholders is not None:
+            return self._cached_placeholders
         ret = []
         for mode, index, type_ in Template.substitition_re.findall(self._xml):
             ret.append((int(index), int(type_), mode == "Conditional"))
-        return sorted(ret, key=lambda p: p[0])
+        self._cached_placeholders = sorted(ret, key=lambda p: p[0])
+        return self._cached_placeholders
 
     def match_substitutions(self, substitutions):
         """
