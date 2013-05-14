@@ -85,8 +85,6 @@ def main():
                     type_ = int(substitution_line.partition("(")[2].partition(")")[0], 0x10)
                     substitution = substitution_line.partition(": ")[2]
                     substitutions.append((index, type_, substitution))
-#                substitutions = map(lambda p: (p[1], p[2]),
-#                                    sorted(substitutions, key=lambda p: p[0]))
                 substitutions = sorted(substitutions, key=lambda p: p[0])
 
 
@@ -95,12 +93,18 @@ def main():
                     template = templates.get_template(eid, substitutions,
                                                       exact_match=not args.assume_first_template)
                 except TemplateEIDConflictError as e:
-                    raise e
-                except TemplateNotFoundError as e:
                     unfixed.write("RECORD\n")
+                    unfixed.write("Reason: %s\n" % str(e))
                     unfixed.write(record_txt)
                     num_unreconstructed += 1
-                    logger.debug("Unable to reconstruct record with EID %d", eid)
+                    logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
+                    continue
+                except TemplateNotFoundError as e:
+                    unfixed.write("RECORD\n")
+                    unfixed.write("Reason: %s\n" % str(e))
+                    unfixed.write(record_txt)
+                    num_unreconstructed += 1
+                    logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
                     continue
                 fixed.write(template.insert_substitutions(substitutions))
                 num_reconstructed += 1
