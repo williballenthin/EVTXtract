@@ -122,7 +122,8 @@ def extract_chunk(buf, offset, templates):
                             hex(record.offset()))
             continue
         except Exception as e:
-            logger.info("Unknown exception processing record at %s: %s" % (hex(record.offset()), str(e)))
+            logger.info("Unknown exception processing record at %s: %s" % \
+                            (hex(record.offset()), str(e)))
             continue
     return "\n".join(xml)
 
@@ -133,7 +134,8 @@ def main():
         description="Find offsets of EVTX chunk records.")
     parser.add_argument("--records_outfile", type=str, default="records.xml",
                         help="The path to the output file for records")
-    parser.add_argument("--templates_outfile", type=str, default="templates.txt",
+    parser.add_argument("--templates_outfile", type=str,
+                        default="templates.txt",
                         help="The path to the output file for templates")
     parser.add_argument("--verbose", action="store_true",
                         help="Enable debugging output")
@@ -159,7 +161,7 @@ def main():
                 for line in g.read().split("\n"):
                     hit_type, _, offset = line.partition("\t")
                     logger.debug("Processing line: %s, %s", hit_type, offset)
-                    if hit_type != "CHUNK_VALID":  # TODO(wb): I dont like string matching
+                    if hit_type != "CHUNK_VALID":
                         logging.debug("Skipping, cause its not a valid chunk")
                         continue
                     offset = int(offset, 0x10)
