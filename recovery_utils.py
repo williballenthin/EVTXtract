@@ -139,6 +139,11 @@ class Template(object):
                 return False
         return True
 
+    escape_re = re.compile(r"\\\\(\d)")
+    @staticmethod
+    def _escape(value):
+        return Template.escape_re.sub(r"\\\\\\\\\1", re.escape(value))
+
     def insert_substitutions(self, substitutions):
         """
         Return a copy of the template with the given substitutions inserted.
@@ -153,8 +158,8 @@ class Template(object):
         """
         ret = self._xml
         for index, type_, value in substitutions:
-            from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-            ret = re.sub(from_pattern, value, ret)
+            from_pattern = "\[:?(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
+            ret = re.sub(from_pattern, Template._escape(value), ret)
         return ret
 
     def serialize(self):
@@ -265,11 +270,12 @@ class TemplateDatabase(object):
                 matching_templates.append(template)
 
         if exact_match and len(matching_templates) > 1:
+            matches = map(lambda t: t.get_id(), matching_templates)
             raise TemplateEIDConflictError("%d templates matched query for "
-                                           "EID %d and substitutions" % eid)
+                                           "EID %d and substitutions: %s" % (len(matching_templates), eid, matches))
         if len(matching_templates) == 0:
             sig = str(eid) + "-" + "-".join(["[%d|%d| ]" % (i, j) for i, j in \
-                                                 enumerate(map(lambda p: p[0], substitutions))])
+                                                 enumerate(map(lambda p: p[1], substitutions))])
             raise TemplateNotFoundError(
                 "No loaded templates with given substitution signature: %s" % sig)
 
