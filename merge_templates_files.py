@@ -26,6 +26,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(
         description="Merge existing template files, deduping identical templates.")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable debugging output")
     parser.add_argument("templates_outfile", type=str,
                         help="Path to the output template file")
     parser.add_argument("templates_files", type=str, nargs="+",
@@ -41,7 +43,7 @@ def main():
     for file_ in args.templates_files:
         new_templates = TemplateDatabase()
         with open(file_, "rb") as f:
-            new_templates.deserialize(f.read())
+            new_templates.deserialize(f.read(), warn_on_conflict=False)
         templates.extend(new_templates)
 
     with open(args.templates_outfile, "wb") as f:

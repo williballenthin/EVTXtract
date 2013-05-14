@@ -295,7 +295,7 @@ class TemplateDatabase(object):
         """
         self._templates = {}
         for template_txt in txt.split("TEMPLATE\n"):
-            template = Template.deserialize("TEMPLATE\n" + template_txt)
+            template = Template.deserialize("TEMPLATE\n" + template_txt.rstrip("\n"))
             if template is None:
                 continue
             if template.get_id() in self._templates and warn_on_conflict:
