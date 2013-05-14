@@ -291,6 +291,12 @@ class TemplateDatabase(object):
         return matching_templates[0]
 
     def serialize(self):
+        """
+        Create a string representation of this database, suitable
+          for human review or deserialization.
+
+        @rtype: str
+        """
         ret = []
         for id_ in sorted(self._templates.keys()):
             for template in self._templates[id_]:
