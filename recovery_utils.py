@@ -140,8 +140,17 @@ class Template(object):
         return True
 
     escape_re = re.compile(r"\\\\(\d)")
+
     @staticmethod
     def _escape(value):
+        """
+        Escape the static value to be used in a regular expression
+          subsititution. This processes any backreferences and
+          makes them plain, escaped sequences.
+
+        @type value: str
+        @rtype: str
+        """
         return Template.escape_re.sub(r"\\\\\\\\\1", re.escape(value))
 
     def insert_substitutions(self, substitutions):
