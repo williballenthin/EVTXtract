@@ -227,6 +227,17 @@ class TemplateDatabase(object):
             else:
                 self._eid_map[template.get_eid()] = [id_]
 
+    def extend(self, other):
+        """
+        Merge another TemplateDatabase into this one.
+
+        @type other: TemplateDatabase
+        @rtype: None
+        """
+        for template_list in other._templates.values():
+            for template in template_list:
+                self.add_template(template)
+
     def get_template(self, eid, substitutions, exact_match=True):
         """
         Given an ID, attempt to pick the appropriate template.
