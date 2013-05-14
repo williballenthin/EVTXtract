@@ -24,6 +24,7 @@ import contextlib
 
 from Evtx.Evtx import ChunkHeader
 from Evtx.Nodes import BXmlTypeNode
+from Evtx.Evtx import InvalidRecordException
 
 from recovery_utils import get_eid
 from recovery_utils import Template
@@ -105,14 +106,19 @@ def extract_chunk(buf, offset, templates):
     for record in chunk.records():
         try:
             template = get_template(record)
+            record_xml = record.root().xml([]).encode("utf-8")
             templates.add_template(template)
-            xml.append(record.root().xml([]).encode("utf-8"))
+            xml.append(record_xml)
         except UnicodeEncodeError:
             logger.info("Unicode encoding issue processing record at %s" % \
                             hex(record.offset()))
             continue
         except UnicodeDecodeError:
             logger.info("Unicode decoding issue processing record at %s" % \
+                            hex(record.offset()))
+            continue
+        except InvalidRecordException:
+            logger.info("EVTX parsing issue processing record at %s" % \
                             hex(record.offset()))
             continue
         except Exception as e:
