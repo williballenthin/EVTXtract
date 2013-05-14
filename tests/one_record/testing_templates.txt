@@ -1,0 +1,33 @@
+TEMPLATE
+ID: 4735-[0|4|c]-[1|4|c]-[2|6|c]-[3|6|c]-[4|6|c]-[5|21|c]-[6|17|c]-[7|15|c]-[8|8|c]-[9|8|c]-[10|10|c]-[11|4|c]-[12|19|c]-[13|15|c]-[14|1|c]-[15|15|c]-[16|1|c]-[17|1|n]-[18|1|n]-[19|19|n]-[20|19|n]-[21|1|n]-[22|1|n]-[23|21|n]-[24|1|n]-[25|1|n]-[26|1|n]
+EID: 4735
+OFFSET: 9472
+
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+<System>
+<Provider Name="[Conditional Substitution(index=14, type=1)]" Guid="[Conditional Substitution(index=15, type=15)]" />
+<EventID Qualifiers="[Conditional Substitution(index=4, type=6)]">[Conditional Substitution(index=3, type=6)]</EventID>
+<Version>[Conditional Substitution(index=11, type=4)]</Version>
+<Level>[Conditional Substitution(index=0, type=4)]</Level>
+<Task>[Conditional Substitution(index=2, type=6)]</Task>
+<Opcode>[Conditional Substitution(index=1, type=4)]</Opcode>
+<Keywords>[Conditional Substitution(index=5, type=21)]</Keywords>
+<TimeCreated SystemTime="[Conditional Substitution(index=6, type=17)]" />
+<EventRecordID>[Conditional Substitution(index=10, type=10)]</EventRecordID>
+<Correlation ActivityID="[Conditional Substitution(index=7, type=15)]" RelatedActivityID="[Conditional Substitution(index=13, type=15)]" />
+<Execution ProcessID="[Conditional Substitution(index=8, type=8)]" ThreadID="[Conditional Substitution(index=9, type=8)]" />
+<Channel>[Conditional Substitution(index=16, type=1)]</Channel>
+<Computer>37L4247F27-25</Computer>
+<Security UserID="[Conditional Substitution(index=12, type=19)]" /></System>
+<EventData>
+<Data Name="TargetUserName">[Normal Substitution(index=17, type=1)]</Data>
+<Data Name="TargetDomainName">[Normal Substitution(index=18, type=1)]</Data>
+<Data Name="TargetSid">[Normal Substitution(index=19, type=19)]</Data>
+<Data Name="SubjectUserSid">[Normal Substitution(index=20, type=19)]</Data>
+<Data Name="SubjectUserName">[Normal Substitution(index=21, type=1)]</Data>
+<Data Name="SubjectDomainName">[Normal Substitution(index=22, type=1)]</Data>
+<Data Name="SubjectLogonId">[Normal Substitution(index=23, type=21)]</Data>
+<Data Name="PrivilegeList">[Normal Substitution(index=24, type=1)]</Data>
+<Data Name="SamAccountName">[Normal Substitution(index=25, type=1)]</Data>
+<Data Name="SidHistory">[Normal Substitution(index=26, type=1)]</Data></EventData></Event>
+

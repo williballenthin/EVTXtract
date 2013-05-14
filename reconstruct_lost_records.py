@@ -19,7 +19,9 @@
 #   Version v0.1
 import logging
 
-from extract_valid_evtx_records_and_templates import make_replacement
+from recovery_utils import TemplateDatabase
+from recovery_utils import TemplateEIDConflictError
+from recovery_utils import TemplateNotFoundError
 
 
 def main():
@@ -28,6 +30,9 @@ def main():
         description="Reconstruct lost EVTX records using recovered templates.")
     parser.add_argument("--verbose", action="store_true",
                         help="Enable debugging output")
+    parser.add_argument("--assume_first_template", action="store_true",
+                        help="Assume first template with ID in file matches."
+                        " Warning: Not for forensics.")
     parser.add_argument("templates", type=str,
                         help="Path to the file containing recovered templates")
     parser.add_argument("records", type=str,
@@ -50,7 +55,9 @@ def main():
 
     with open(args.templates, "rb") as f:
         templates_txt = f.read()
-    templates = load_templates(templates_txt)
+    templates = TemplateDatabase()
+    templates.deserialize(templates_txt,
+                          warn_on_conflict=not args.assume_first_template)
 
     with open(args.records, "rb") as f:
         records_txt = f.read()
@@ -66,31 +73,36 @@ def main():
                     continue
 
                 record_lines = record_txt.split("\n")
-                try:
-                    eid_line = record_lines[3]
-                except:
-                    print ">>" + record_txt + "<<"
-                    return 
-
+                eid_line = record_lines[3]
                 _, __, eid = eid_line.partition(": ")
                 eid = int(eid)
 
-                if eid not in templates:
+                substitutions = []
+                for substitution_line in record_lines[4:]:
+                    if "substitution" not in substitution_line:
+                        continue
+                    index = int(substitution_line.partition("-")[2].partition(" ")[0])
+                    type_ = int(substitution_line.partition("(")[2].partition(")")[0], 0x10)
+                    substitution = substitution_line.partition(": ")[2]
+                    substitutions.append((index, type_, substitution))
+#                substitutions = map(lambda p: (p[1], p[2]),
+#                                    sorted(substitutions, key=lambda p: p[0]))
+                substitutions = sorted(substitutions, key=lambda p: p[0])
+
+
+                try:
+                    logger.debug("Fetching template for EID: %d num_subs: %d" % (eid, len(substitutions)))
+                    template = templates.get_template(eid, substitutions,
+                                                      exact_match=not args.assume_first_template)
+                except TemplateEIDConflictError as e:
+                    raise e
+                except TemplateNotFoundError as e:
                     unfixed.write("RECORD\n")
                     unfixed.write(record_txt)
                     num_unreconstructed += 1
                     logger.debug("Unable to reconstruct record with EID %d", eid)
                     continue
-
-                record = templates[eid]
-                for substitution_line in record_lines[4:]:
-                    if "substitution" not in substitution_line:
-                        continue
-                    index = substitution_line.partition("-")[2].partition(" ")[0]
-                    index = int(index)
-                    substitution = substitution_line.partition(": ")[2]
-                    record = make_replacement(record, index, substitution)
-                fixed.write(record)
+                fixed.write(template.insert_substitutions(substitutions))
                 num_reconstructed += 1
                 logger.debug("Reconstructed record with EID %d", eid)
         fixed.write("</Events>")
