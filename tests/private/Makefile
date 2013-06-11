@@ -1,4 +1,4 @@
-SUBDIRS = private public
+SUBDIRS = chunk_fragment  complete_evtx  few_records  one_record  valid_chunk
 .PHONY: $(SUBDIRS)
 
 $(SUBDIRS):
