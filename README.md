@@ -29,6 +29,6 @@ Algorithm
    - extract timestamp
    - attempt to parse substitutions
    - attempt to decode substitutions into EID, other fields
-
+5. Reconstruct records by reusing old templates with recovered substitutions
 
 
