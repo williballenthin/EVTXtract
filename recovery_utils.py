@@ -167,7 +167,7 @@ class Template(object):
         """
         ret = self._xml
         for index, type_, value in substitutions:
-            from_pattern = "\[:?(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
+            from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
             ret = re.sub(from_pattern, Template._escape(value), ret)
         return ret
 
