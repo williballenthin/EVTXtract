@@ -1,4 +1,4 @@
-SUBDIRS = chunk_fragment  complete_evtx  few_records  one_record  valid_chunk
+SUBDIRS = chunk_fragment  complete_evtx  few_records  one_record  valid_chunk  badfilesdir  win2008r2test  memoryevtx
 .PHONY: $(SUBDIRS)
 
 $(SUBDIRS):
