@@ -1,0 +1,11 @@
+This is from Jamie Levy <jamie.levy@gmail.com>
+
+The problem is, of course, that you often just get fragments of evtx
+files even when you're extracting them from cache (which makes sense
+since we don't need the entire log in memory).  For one case I was
+lucky that the log that was extracted was still parsable with Andreas'
+scripts and sometimes with tweaking of either the file or his script
+I've been able to get more on other cases.  On average you will find
+1-3 ElfChunk sections in an extracted evtx which may or may not also
+include an ElfFile section.  I've attached a sample extracted from
+memory from a test Win2008 R2 VM for your testing purposes.
