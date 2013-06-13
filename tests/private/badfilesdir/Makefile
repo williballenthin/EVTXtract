@@ -10,7 +10,7 @@ LOST_LIST = "./lost_list.txt"
 RECOVERED_RECORDS = "./recovered_records.txt"
 RECONSTRUCTED_RECORDS = "./reconstructed_records.xml"
 UNRECONSTRUCTED_RECORDS = "./unreconstructed_records.txt"
-TESTFILE = "ODiag.evtx"
+TESTFILE = "empty.evtx"
 
 .PHONY: test_find_chunks
 test_find_chunks:
