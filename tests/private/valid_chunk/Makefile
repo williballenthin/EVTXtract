@@ -25,7 +25,7 @@ test_find_chunks:
 .PHONY: test_extract_templates
 test_extract_templates: test_find_chunks
 	@echo "-- Testing extract_valid_templates_and_records --"
-	@python $(EXTRACT_TEMPLATES) $(TESTFILE) $(CHUNK_LIST) --records_outfile=$(RECORDS_XML) --templates_outfile=$(TEMPLATES_TXT)
+	python $(EXTRACT_TEMPLATES) $(TESTFILE) $(CHUNK_LIST) --records_outfile=$(RECORDS_XML) --templates_outfile=$(TEMPLATES_TXT)
 	@if [ $$(cat "records.xml" | grep -a "<Event " | wc -l) -eq 103 ]; then echo "\033[1;32mpass\033[m"; else echo "\033[1;31mFAIL\033[m"; fi
 	@if [ $$(cat "templates.txt" | grep -a "TEMPLATE" | wc -l) -eq 19 ]; then echo "\033[1;32mpass\033[m"; else echo "\033[1;31mFAIL\033[m"; fi
 
