@@ -17,21 +17,25 @@
 #   limitations under the License.
 #
 #   Version v0.1
+import os
 import re
-import logging
+import sys
 import mmap
+import logging
 import contextlib
 
 from Evtx.Evtx import ChunkHeader
 from Evtx.Nodes import BXmlTypeNode
 from Evtx.Evtx import InvalidRecordException
+from Evtx.Views import evtx_template_readable_view
+from Evtx.Views import evtx_record_xml_view
 
 from recovery_utils import get_eid
 from recovery_utils import Template
 from recovery_utils import TemplateDatabase
 
 
-def get_template(record):
+def get_template(record, record_xml):
     def make_replacement(template, index, substitution):
         """
         Makes a substitution given a template as a string.
@@ -60,7 +64,7 @@ def get_template(record):
         @type current_index: int
         @rtype: str
         """
-        template = root.template_format()
+        template = evtx_template_readable_view(root)
         replacements = []
         for index, substitution in enumerate(root.substitutions()):
             # find all sub-templates
@@ -85,7 +89,7 @@ def get_template(record):
         return template
 
     template = get_complete_template(record.root(), current_index=0)
-    return Template(get_eid(record), template, record.offset())
+    return Template(get_eid(record_xml), template, record.offset())
 
 
 def extract_chunk(buf, offset, templates):
@@ -103,10 +107,11 @@ def extract_chunk(buf, offset, templates):
     chunk = ChunkHeader(buf, offset)
 
     xml = []
+    cache = {}
     for record in chunk.records():
         try:
-            template = get_template(record)
-            record_xml = record.root().xml([]).encode("utf-8")
+            record_xml = evtx_record_xml_view(record, cache=cache)
+            template = get_template(record, record_xml)
             templates.add_template(template)
             xml.append(record_xml)
         except UnicodeEncodeError:
@@ -124,6 +129,7 @@ def extract_chunk(buf, offset, templates):
         except Exception as e:
             logger.info("Unknown exception processing record at %s: %s" % \
                             (hex(record.offset()), str(e)))
+            raise e
             continue
     return "\n".join(xml)
 
@@ -157,6 +163,14 @@ def main():
                                           access=mmap.ACCESS_READ)) as buf:
             xml = []
             templates = TemplateDatabase()
+            if os.path.exists(args.templates_outfile):
+                with open(args.templates_outfile) as g:
+                    try:
+                        templates.deserialize(g.read())
+                    except Exception as e:
+                        logging.critical("Exception parsing existing templates file: %s", str(e))
+                        sys.exit(-1)
+
             with open(args.chunk_hits_file, "rb") as g:
                 for line in g.read().split("\n"):
                     hit_type, _, offset = line.partition("\t")
@@ -166,11 +180,35 @@ def main():
                         continue
                     offset = int(offset, 0x10)
                     xml.append(extract_chunk(buf, offset, templates))
-    with open(args.records_outfile, "wb") as f:
-        f.write("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>")
-        f.write("<Events>")
-        f.write("\n".join(xml))
-        f.write("</Events>")
+
+    xml_header = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>"
+    events_start = "<Events>"
+    events_end = "</Events>"
+    should_append = False
+    if os.path.exists(args.records_outfile):
+        should_append = True
+        with open(args.records_outfile, "rb") as f:
+            lines = f.read().split("\n")
+            if len(lines) < 3:
+                should_append = False
+            if lines[0] != xml_header:
+                should_append = False
+            if len(lines) > 1 and lines[1] != events_start:
+                should_append = False
+            if lines[-1] != events_end:
+                should_append = False
+    if should_append:
+        with open(args.records_outfile, "wb") as f:
+            for line in lines[:-2]:
+                f.write(line)
+            f.write("\n".join(xml))
+            f.write(events_end)
+    else:
+        with open(args.records_outfile, "wb") as f:
+            f.write(xml_header + "\n")
+            f.write(events_start + "\n")
+            f.write("\n".join(xml))
+            f.write(events_end)
     with open(args.templates_outfile, "wb") as f:
         f.write(templates.serialize())
 

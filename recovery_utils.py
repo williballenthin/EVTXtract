@@ -24,27 +24,42 @@ import logging
 from lxml import etree
 
 
-def to_lxml(record):
+def to_lxml(record_xml):
     """
-    @type record: Record
+    Convert an XML string to an Etree element.
+
+    @type record_xml: str
+    @rtype: etree.Element
     """
-    return etree.fromstring(
-        "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>%s" %
-        (record.root().xml([]).encode("utf-8")))
+    if "<?xml" not in record_xml:
+        return etree.fromstring(
+            "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>%s" %
+            record_xml)
+    else:
+        return etree.fromstring(record_xml)
 
 
 def get_child(node, tag,
               ns="{http://schemas.microsoft.com/win/2004/08/events/event}"):
     """
-    @type node: Element
+    Given an Etree element, get the first child node with the given tag.
+
+    @type node: etree.Element
     @type tag: str
     @type ns: str
+    @rtype: etree.Element or None
     """
     return node.find("%s%s" % (ns, tag))
 
 
-def get_eid(record):
-    return get_child(get_child(to_lxml(record), "System"), "EventID").text
+def get_eid(record_xml):
+    """
+    Given EVTX record XML, return the EID of the record.
+
+    @type record_xml: str
+    @rtype: str
+    """
+    return get_child(get_child(to_lxml(record_xml), "System"), "EventID").text
 
 
 class Template(object):
@@ -281,12 +296,14 @@ class TemplateDatabase(object):
         if exact_match and len(matching_templates) > 1:
             matches = map(lambda t: t.get_id(), matching_templates)
             raise TemplateEIDConflictError("%d templates matched query for "
-                                           "EID %d and substitutions: %s" % (len(matching_templates), eid, matches))
+                                           "EID %d and substitutions: %s" %
+                                           (len(matching_templates), eid, matches))
         if len(matching_templates) == 0:
             sig = str(eid) + "-" + "-".join(["[%d|%d| ]" % (i, j) for i, j in \
                                                  enumerate(map(lambda p: p[1], substitutions))])
             raise TemplateNotFoundError(
-                "No loaded templates with given substitution signature: %s" % sig)
+                "No loaded templates with given substitution signature: %s" %
+                sig)
 
         return matching_templates[0]
 
@@ -320,7 +337,8 @@ class TemplateDatabase(object):
             if template is None:
                 continue
             if template.get_id() in self._templates and warn_on_conflict:
-                raise TemplateEIDConflictError("More than one template with ID %s" % template.get_id())
+                raise TemplateEIDConflictError("More than one template with ID %s" %
+                                               template.get_id())
             elif template.get_id() in self._templates and not warn_on_conflict:
                 self._templates[template.get_id()].append(template)
             else:
