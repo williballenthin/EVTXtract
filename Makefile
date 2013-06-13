@@ -1,6 +1,6 @@
-
-
-
+.PHONY: test
+test:
+	@$(MAKE) -C tests test
 
 .PHONY: clean
 clean: 
