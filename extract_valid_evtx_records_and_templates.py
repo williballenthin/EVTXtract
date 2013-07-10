@@ -207,6 +207,7 @@ def main():
                     if hit_type != "CHUNK_VALID":  # TODO(wb): I dont like string matching
                         logging.debug("Skipping, cause its not a valid chunk")
                         continue
+                    offset = offset.rstrip("L\r")
                     offset = int(offset, 0x10)
                     new_xml, new_templates = extract_chunk(buf, offset)
                     xml.append(new_xml)

@@ -43,6 +43,7 @@ def load_templates(templates_txt):
         template_lines = template_txt.split("\n")
         eid_line = template_lines[0]
         _, __, eid = eid_line.partition(": ")
+        eid = eid.rstrip("\r")
         eid = int(eid)
         template = "\n".join(template_lines[3:])
         if eid in templates:
@@ -102,6 +103,7 @@ def main():
                     return 
 
                 _, __, eid = eid_line.partition(": ")
+                eid = eid.rstrip("\r")
                 eid = int(eid)
 
                 if eid not in templates:

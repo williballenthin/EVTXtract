@@ -398,6 +398,7 @@ def main():
             with open(args.records_list, "rb") as g:
                 for line in g.read().split("\n"):
                     hit_type, _, offset = line.partition("\t")
+                    offset = offset.rstrip("L\r")
                     logger.debug("Processing line: %s, %s", hit_type, offset)
                     if hit_type != "LOST_RECORD":
                         logging.debug("Skipping, cause its not a lost record")
