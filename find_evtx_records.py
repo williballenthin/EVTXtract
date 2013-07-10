@@ -101,7 +101,7 @@ def main():
     ranges = []
     with open(args.chunk_list, "rb") as f:
         range_start = 0
-        for line in f.read().split("\n"):
+        for line in f.read().split("L\n"):
             if "CHUNK_VALID" in line:
                 _, __, offset = line.partition("\t")
                 offset = offset.rstrip("\r")
