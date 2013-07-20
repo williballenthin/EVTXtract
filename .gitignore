@@ -39,3 +39,5 @@ find_evtx_chunks.py~
 *.evtx
 workspace/*.xml
 workspace/*.txt
+.idea/*
+.idea
