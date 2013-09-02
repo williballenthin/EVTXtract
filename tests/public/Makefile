@@ -1,4 +1,4 @@
-SUBDIRS = private public
+SUBDIRS = 
 .PHONY: $(SUBDIRS)
 
 $(SUBDIRS):

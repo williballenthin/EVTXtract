@@ -101,10 +101,10 @@ def main():
     ranges = []
     with open(args.chunk_list, "rb") as f:
         range_start = 0
-        for line in f.read().split("L\n"):
+        for line in f.read().split("\n"):
             if "CHUNK_VALID" in line:
                 _, __, offset = line.partition("\t")
-                offset = offset.rstrip("\r")
+                offset = offset.rstrip("L\r")
                 offset = int(offset, 0x10)
                 ranges.append((range_start, offset))
                 range_start = offset + 0x10000
