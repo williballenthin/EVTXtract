@@ -17,147 +17,103 @@
 #   limitations under the License.
 #
 #   Version v0.1
+import os
 import re
-import logging
+import sys
 import mmap
+import logging
 import contextlib
 
-# TODO(wb): fallback to standard xml parser
-from lxml import etree
 from Evtx.Evtx import ChunkHeader
 from Evtx.Nodes import BXmlTypeNode
+from Evtx.Evtx import InvalidRecordException
+from Evtx.Views import evtx_template_readable_view
+from Evtx.Views import evtx_record_xml_view
+
+from recovery_utils import get_eid
+from recovery_utils import Template
+from recovery_utils import TemplateDatabase
 
 
-def to_lxml(record):
+def get_template(record, record_xml):
+    def make_replacement(template, index, substitution):
+        """
+        Makes a substitution given a template as a string.
+
+        Implementation is a huge hack that depends on the
+        brittle template_format() output.
+
+        @type template: str
+        @type index: int
+        @type substitution: str
+        @rtype: str
+        """
+        from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
+        return re.sub(from_pattern, substitution, template)
+
+    def get_complete_template(root, current_index):
+        """
+        Gets the template from a RootNode while resolving any
+        nested templates and fixing up their indices.
+        Depth first ordering/indexing.
+
+        Implementation is a huge hack that depends on the
+          brittle template_format() output.
+
+        @type root: RootNode
+        @type current_index: int
+        @rtype: str
+        """
+        template = evtx_template_readable_view(root)
+        replacements = []
+        for index, substitution in enumerate(root.substitutions()):
+            # find all sub-templates
+            if not isinstance(substitution, BXmlTypeNode):
+                replacements.append(current_index + index)
+                continue
+            subtemplate = get_complete_template(substitution._root,
+                                                current_index=current_index + index)
+            replacements.append(subtemplate)
+            current_index += subtemplate.count("Substitution(index=")
+        replacements.reverse()
+        for i, replacement in enumerate(replacements):
+            index = len(replacements) - i - 1
+            if isinstance(replacement, int):
+                # fixup index
+                from_pattern = "index=%d," % index
+                to_pattern = "index=%d," % replacement
+                template = template.replace(from_pattern, to_pattern)
+            if isinstance(replacement, basestring):
+                # insert sub-template
+                template = make_replacement(template, index, replacement)
+        return template
+
+    template = get_complete_template(record.root(), current_index=0)
+    return Template(get_eid(record_xml), template, record.offset())
+
+
+def extract_chunk(buf, offset, templates):
     """
-    @type record: Record
-    """
-    return etree.fromstring("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>%s" %
-                            (record.root().xml([]).encode("utf-8")))
+    Parse an EVTX chunk into the XML entries
+      and extract the templates into a TemplateDatabase
 
-
-def get_child(node, tag, ns="{http://schemas.microsoft.com/win/2004/08/events/event}"):
-    """
-    @type node: Element
-    @type tag: str
-    @type ns: str
-    """
-    return node.find("%s%s" % (ns, tag))
-
-
-def get_eid(record):
-    return get_child(get_child(to_lxml(record), "System"), "EventID").text
-
-
-def get_template(root):
-    substitutions = root.substitutions()
-    fixed_substitutions = []
-    for substitution in substitutions:
-        if isinstance(substitution, BXmlTypeNode):
-            fixed_substitutions.append(get_template(substitution._root))
-        else:
-            fixed_substitutions.append(substitution.string())
-
-
-def merge_template(templates, eid, offset, template):
-    """
-    Merge a new pair of (offset, template) into an existing
-      database of templates organized by eid.
-
-    Modifies the parameter `templates`.
-
-    @type templates: {int: [(int, str)]}
-    @type eid: int
-    @type offset: int
-    @type template: str
-    @rtype: None
-    """
-    if eid in templates:
-        found_existing = False
-        for offset, existing_template in templates[eid]:
-            if template == existing_template:
-                found_existing = True
-                break
-        if not found_existing:
-            templates[eid].append((offset, template))
-    else:
-        templates[eid] = [(offset, template)]
-
-
-def make_replacement(template, index, substitution):
-    """
-    Makes a substitution given a template as a string.
-
-    Implementation is a huge hack that depends on the
-      brittle template_format() output.
-
-    @type template: str
-    @type index: int
-    @type substitution: str
-    @rtype: str
-    """
-    from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-    return re.sub(from_pattern, substitution, template)
-
-
-def get_complete_template(root, current_index=0):
-    """
-    Gets the template from a RootNode while resolving any
-      nested templates and fixing up their indices.
-    Depth first ordering/indexing.
-
-    Implementation is a huge hack that depends on the
-      brittle template_format() output.
-
-    @type root: RootNode
-    @type current_index: int
-    @rtype: str
-    """
-    template = root.template_format()
-    replacements = []
-    for index, substitution in enumerate(root.substitutions()):
-        # find all sub-templates
-        if not isinstance(substitution, BXmlTypeNode):
-            replacements.append(current_index + index)
-            continue
-        subtemplate = get_complete_template(substitution._root,
-                                            current_index=current_index + index)
-        replacements.append(subtemplate)
-        current_index += subtemplate.count("Substitution(index=")
-    replacements.reverse()
-    for i, replacement in enumerate(replacements):
-        index = len(replacements) - i - 1
-        if isinstance(replacement, int):
-            # fixup index
-            from_pattern = "index=%d," % index
-            to_pattern = "index=%d," % replacement
-            template = template.replace(from_pattern, to_pattern)
-        if isinstance(replacement, basestring):
-            # insert sub-template
-            template = make_replacement(template, index, replacement)
-    return template
-
-
-def extract_chunk(buf, offset):
-    """
-    Parse an EVTX chunk into the XML entries and a dict of templates.
-    Dict schema: {EID --> [(offset, template)]}
+    Modifies parameter `templates`.
 
     @type buf: bytestring
     @type offset: int
-    @rtype: (str, {int: [(int, str)]})
+    @rtype: str
     """
     logger = logging.getLogger("extract_records")
     chunk = ChunkHeader(buf, offset)
 
     xml = []
-    templates = {}
+    cache = {}
     for record in chunk.records():
         try:
-            eid = get_eid(record)
-            template = get_complete_template(record.root())
-            merge_template(templates, eid, record.offset(), template)
-            xml.append(record.root().xml([]).encode("utf-8"))
+            record_xml = evtx_record_xml_view(record, cache=cache)
+            template = get_template(record, record_xml)
+            templates.add_template(template)
+            xml.append(record_xml)
         except UnicodeEncodeError:
             logger.info("Unicode encoding issue processing record at %s" % \
                             hex(record.offset()))
@@ -166,10 +122,16 @@ def extract_chunk(buf, offset):
             logger.info("Unicode decoding issue processing record at %s" % \
                             hex(record.offset()))
             continue
-        except Exception as e:
-            logger.info("Unknown exception processing record at %s: %s" % (hex(record.offset()), str(e)))
+        except InvalidRecordException:
+            logger.info("EVTX parsing issue processing record at %s" % \
+                            hex(record.offset()))
             continue
-    return "\n".join(xml), templates
+        except Exception as e:
+            logger.info("Unknown exception processing record at %s: %s" % \
+                            (hex(record.offset()), str(e)))
+            raise e
+            continue
+    return "\n".join(xml)
 
 
 def main():
@@ -178,7 +140,8 @@ def main():
         description="Find offsets of EVTX chunk records.")
     parser.add_argument("--records_outfile", type=str, default="records.xml",
                         help="The path to the output file for records")
-    parser.add_argument("--templates_outfile", type=str, default="templates.txt",
+    parser.add_argument("--templates_outfile", type=str,
+                        default="templates.txt",
                         help="The path to the output file for templates")
     parser.add_argument("--verbose", action="store_true",
                         help="Enable debugging output")
@@ -199,35 +162,56 @@ def main():
         with contextlib.closing(mmap.mmap(f.fileno(), 0,
                                           access=mmap.ACCESS_READ)) as buf:
             xml = []
-            templates = {}
+            templates = TemplateDatabase()
+            if os.path.exists(args.templates_outfile):
+                with open(args.templates_outfile) as g:
+                    try:
+                        templates.deserialize(g.read())
+                    except Exception as e:
+                        logging.critical("Exception parsing existing templates file: %s", str(e))
+                        sys.exit(-1)
+
             with open(args.chunk_hits_file, "rb") as g:
                 for line in g.read().split("\n"):
                     hit_type, _, offset = line.partition("\t")
                     logger.debug("Processing line: %s, %s", hit_type, offset)
-                    if hit_type != "CHUNK_VALID":  # TODO(wb): I dont like string matching
+                    if hit_type != "CHUNK_VALID":
                         logging.debug("Skipping, cause its not a valid chunk")
                         continue
                     offset = offset.rstrip("L\r")
                     offset = int(offset, 0x10)
-                    new_xml, new_templates = extract_chunk(buf, offset)
-                    xml.append(new_xml)
+                    xml.append(extract_chunk(buf, offset, templates))
 
-                    # merge new templates into existing templates
-                    for eid in new_templates.keys():
-                        for offset, template in new_templates[eid]:
-                            merge_template(templates, eid, offset, template)
-    with open(args.records_outfile, "wb") as f:
-        f.write("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>")
-        f.write("<Events>")
-        f.write("\n".join(xml))
-        f.write("</Events>")
+    xml_header = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>"
+    events_start = "<Events>"
+    events_end = "</Events>"
+    should_append = False
+    if os.path.exists(args.records_outfile):
+        should_append = True
+        with open(args.records_outfile, "rb") as f:
+            lines = f.read().split("\n")
+            if len(lines) < 3:
+                should_append = False
+            if lines[0] != xml_header:
+                should_append = False
+            if len(lines) > 1 and lines[1] != events_start:
+                should_append = False
+            if lines[-1] != events_end:
+                should_append = False
+    if should_append:
+        with open(args.records_outfile, "wb") as f:
+            for line in lines[:-2]:
+                f.write(line)
+            f.write("\n".join(xml))
+            f.write(events_end)
+    else:
+        with open(args.records_outfile, "wb") as f:
+            f.write(xml_header + "\n")
+            f.write(events_start + "\n")
+            f.write("\n".join(xml))
+            f.write(events_end)
     with open(args.templates_outfile, "wb") as f:
-        for eid in sorted(templates.keys()):
-            for offset, template in templates[eid]:
-                f.write("TEMPLATE\n")
-                f.write("EID: %s\n" % eid)
-                f.write("OFFSET: %s\n" % (offset))
-                f.write("%s\n\n\n" % template)
+        f.write(templates.serialize())
 
 
 if __name__ == "__main__":

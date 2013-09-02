@@ -41,3 +41,5 @@ workspace/*.xml
 workspace/*.txt
 .idea/*
 .idea
+*_templates.txt
+*_chunks.txt

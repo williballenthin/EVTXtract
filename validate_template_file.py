@@ -19,8 +19,8 @@
 #   Version v0.1
 import sys
 
-from reconstruct_lost_records import load_templates
-from reconstruct_lost_records import TemplateEIDConflictError
+from recovery_utils import TemplateDatabase
+from recovery_utils import TemplateEIDConflictError
 
 
 def main():
@@ -33,18 +33,47 @@ def main():
 
     with open(args.templates, "rb") as f:
         templates_txt = f.read()
+
+    # we break rules below be reaching into `templates`. Sorry :-(
+    templates = TemplateDatabase()
     try:
-        load_templates(templates_txt)
-    except TemplateEIDConflictError as e:
-        print(str(e))
+        templates.deserialize(templates_txt, warn_on_conflict=True)
+
+        print "Template Distribution:"
+        for eid in sorted(templates._eid_map.keys()):
+            print "  EID: %6d  --> %2d templates" % \
+                (eid, len(templates._eid_map[eid]))
+
+        print ""
+        print "  Summary   "
+        print "-------------"
+        print "No Conflicts!"
+        sys.exit(0)
+    except TemplateEIDConflictError:
+        templates.deserialize(templates_txt, warn_on_conflict=False)
+
+        print "Template Distribution:"
+        for eid in sorted(templates._eid_map.keys()):
+            ids = []
+            tt = []
+            for id_ in templates._eid_map[eid]:
+                tt.extend(templates._templates[id_])
+                ids.append(id_)
+
+            if len(ids) != len(tt):
+                print "  EID: %6d  --> %2d templates (%d conflicts)" % \
+                    (eid, len(tt), len(tt) - len(ids))
+            else:
+                print "  EID: %6d  --> %2d templates" % \
+                    (eid, len(templates._eid_map[eid]))
+
+        print ""
+        print "        Summary        "
+        print "-----------------------"
+
+        print "There are %d Conflicts!" % \
+            (sum(map(len, templates._templates.values())) - len(templates._templates.keys()))
         sys.exit(-1)
-    except Exception as e:
-        print "Failed to parse templates file"
-        raise e
-
-    print("File verified")
-    sys.exit(0)
-
 
 
 if __name__ == "__main__":
