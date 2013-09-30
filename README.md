@@ -32,3 +32,6 @@ Algorithm
 5. Reconstruct records by reusing old templates with recovered substitutions
 
 
+TODO
+----
+1. Consider to start using pretty-printed JSON files for the database format?

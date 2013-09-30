@@ -137,7 +137,7 @@ def extract_root_substitutions(buf, offset, max_offset):
 
     num_subs = struct.unpack_from("<I", buf, ofs)[0]
     if num_subs > 100:
-        raise Exception("Unexpected number of substitutions: %d at %s" % 
+        raise Exception("Unexpected number of substitutions: %d at %s" %
                         (num_subs, hex(ofs)))
     ofs += 4  # begin sub list
     logger.debug("There are %d substitutions", num_subs)
@@ -155,7 +155,7 @@ def extract_root_substitutions(buf, offset, max_offset):
         type_, size = pair
         if ofs > max_offset:
             raise MaxOffsetReached("Substitutions overran record buffer.")
-        logger.debug("[%d/%d] substitution type %s at %s length %s", 
+        logger.debug("[%d/%d] substitution type %s at %s length %s",
                      i + 1, num_subs, hex(type_), hex(ofs), hex(size))
         value = None
         #[0] = parse_null_type_node,
@@ -240,11 +240,11 @@ def extract_root_substitutions(buf, offset, max_offset):
             _bin = buf[offset:offset + 16]
             h = map(ord, _bin)
             value = "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x" % \
-            (h[3], h[2], h[1], h[0],
-             h[5], h[4],
-             h[7], h[6],
-             h[8], h[9],
-             h[10], h[11], h[12], h[13], h[14], h[15])
+                    (h[3], h[2], h[1], h[0],
+                     h[5], h[4],
+                     h[7], h[6],
+                     h[8], h[9],
+                     h[10], h[11], h[12], h[13], h[14], h[15])
             ret.append((type_, value))
             logger.debug("Value: %s", value)
         #[16] = parse_size_type_node,
@@ -267,7 +267,7 @@ def extract_root_substitutions(buf, offset, max_offset):
         elif type_ == 0x12:
             parts = struct.unpack_from("<WWWWWWWW", buf, ofs)
             value = datetime.datetime(parts[0], parts[1],
-                                      parts[3],  # skip part 2 (day of week)
+                                      parts[3], # skip part 2 (day of week)
                                       parts[4], parts[5],
                                       parts[6], parts[7])
             ret.append((type_, value))
@@ -335,14 +335,14 @@ def extract_lost_record(buf, offset):
     logger.debug("Extracting lost node at %s, num %s, time %se",
                  hex(offset), hex(record_num), timestamp.isoformat("T") + "Z")
     root_offset = offset + 0x18
-    substitutions = extract_root_substitutions(buf, root_offset, 
+    substitutions = extract_root_substitutions(buf, root_offset,
                                                offset + record_size)
     return {
         "offset": offset,
         "record_num": record_num,
         "timestamp": timestamp,
         "substitutions": substitutions,
-        }
+    }
 
 
 def format_record(record):
@@ -352,12 +352,10 @@ def format_record(record):
     @type record: dict
     @rtype: str
     """
-    ret = []
-    ret.append("RECORD")
-    ret.append("offset: %s" % hex(record["offset"]))
-    ret.append("timestamp: %s" % record["timestamp"].isoformat("T") + "Z")
-    ret.append("record_num: %s" % record["record_num"])
-    ret.append("EID: %s" % record["substitutions"][3][1])
+    ret = ["RECORD", "offset: %s" % hex(record["offset"]),
+           "timestamp: %s" % record["timestamp"].isoformat("T") + "Z",
+           "record_num: %s" % record["record_num"],
+           "EID: %s" % record["substitutions"][3][1]]
     for i, pair in enumerate(record["substitutions"]):
         type_, value = pair
         val_str = None
@@ -373,6 +371,7 @@ def format_record(record):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
         description="Extract lost EVTX records.")
     parser.add_argument("--verbose", action="store_true",
@@ -381,7 +380,7 @@ def main():
                         help="Path to the Windows EVTX file")
     parser.add_argument("records_list", type=str,
                         help="The path to the file containing a list of "
-                        "record offsets")
+                             "record offsets")
     args = parser.parse_args()
 
     if args.verbose:
@@ -410,13 +409,12 @@ def main():
                         print "\n"
                         num_extracted += 1
                     except Exception:
-                        logging.warning("Exception encountered processing lost record at %s", hex(offset), exc_info=True)
+                        logging.warning("Exception encountered processing lost record at %s", hex(offset),
+                                        exc_info=True)
                         num_failures += 1
 
     print("# Number of extracted records: %d" % num_extracted)
     print("# Number of failed record extractions: %d" % num_failures)
-
-
 
 
 if __name__ == "__main__":

@@ -35,60 +35,86 @@ from recovery_utils import Template
 from recovery_utils import TemplateDatabase
 
 
+_replacement_patterns = {i: re.compile("\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % i) for i in
+                         xrange(35)}
+
+
+def _make_replacement(template, index, substitution):
+    """
+    Makes a substitution given a template as a string.
+
+    Implementation is a huge hack that depends on the
+    brittle template_format() output.
+
+    @type template: str
+    @type index: int
+    @type substitution: str
+    @rtype: str
+    """
+    if index not in _replacement_patterns:
+        from_pattern = re.compile("\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index)
+        _replacement_patterns[index] = from_pattern
+    return _replacement_patterns[index].sub(substitution, template)
+
+
+_index_strings = {i: "index=%d" % i for i in xrange(35)}
+
+
+def _get_complete_template(root, current_index=0):
+    """
+    Gets the template from a RootNode while resolving any
+    nested templates and fixing up their indices.
+    Depth first ordering/indexing.
+
+    Implementation is a huge hack that depends on the
+      brittle template_format() output.
+
+    @type root: RootNode
+    @type current_index: int
+    @rtype: str
+    """
+    template = evtx_template_readable_view(root)
+
+    # walk through each substitution.
+    # if its a normal node, continue
+    # else its a subtemplate, and we count the number of substitutions _it_ has
+    #   so that we can later fixup all the indices
+    replacements = []
+    for index, substitution in enumerate(root.substitutions()):
+        # find all sub-templates
+        if not isinstance(substitution, BXmlTypeNode):
+            replacements.append(current_index + index)
+            continue
+        subtemplate = _get_complete_template(substitution._root,
+                                             current_index=current_index + index)
+        replacements.append(subtemplate)
+        current_index += subtemplate.count("Substitution(index=")
+    replacements.reverse()
+
+    # now walk through all the indices and fix them up depth-first
+    for i, replacement in enumerate(replacements):
+        index = len(replacements) - i - 1
+        if isinstance(replacement, int):
+            # fixup index                             # cached:
+            from_pattern = _index_strings[index]      # "index=%d" % index
+            to_pattern = _index_strings[replacement]  # "index=%d" % replacement
+            template = template.replace(from_pattern, to_pattern)
+        if isinstance(replacement, basestring):
+            # insert sub-template
+            template = _make_replacement(template, index, replacement)
+    return template
+
+
 def get_template(record, record_xml):
-    def make_replacement(template, index, substitution):
-        """
-        Makes a substitution given a template as a string.
+    """
+    Given a complete Record, parse out the nodes that make up the Template
+      and return it as a Template.
 
-        Implementation is a huge hack that depends on the
-        brittle template_format() output.
-
-        @type template: str
-        @type index: int
-        @type substitution: str
-        @rtype: str
-        """
-        from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-        return re.sub(from_pattern, substitution, template)
-
-    def get_complete_template(root, current_index):
-        """
-        Gets the template from a RootNode while resolving any
-        nested templates and fixing up their indices.
-        Depth first ordering/indexing.
-
-        Implementation is a huge hack that depends on the
-          brittle template_format() output.
-
-        @type root: RootNode
-        @type current_index: int
-        @rtype: str
-        """
-        template = evtx_template_readable_view(root)
-        replacements = []
-        for index, substitution in enumerate(root.substitutions()):
-            # find all sub-templates
-            if not isinstance(substitution, BXmlTypeNode):
-                replacements.append(current_index + index)
-                continue
-            subtemplate = get_complete_template(substitution._root,
-                                                current_index=current_index + index)
-            replacements.append(subtemplate)
-            current_index += subtemplate.count("Substitution(index=")
-        replacements.reverse()
-        for i, replacement in enumerate(replacements):
-            index = len(replacements) - i - 1
-            if isinstance(replacement, int):
-                # fixup index
-                from_pattern = "index=%d," % index
-                to_pattern = "index=%d," % replacement
-                template = template.replace(from_pattern, to_pattern)
-            if isinstance(replacement, basestring):
-                # insert sub-template
-                template = make_replacement(template, index, replacement)
-        return template
-
-    template = get_complete_template(record.root(), current_index=0)
+    @type record: Record
+    @type record_xml: str
+    @rtype: Template
+    """
+    template = _get_complete_template(record.root())
     return Template(get_eid(record_xml), template, record.offset())
 
 
@@ -101,6 +127,7 @@ def extract_chunk(buf, offset, templates):
 
     @type buf: bytestring
     @type offset: int
+    @type templates: TemplateDatabase
     @rtype: str
     """
     logger = logging.getLogger("extract_records")
@@ -116,19 +143,19 @@ def extract_chunk(buf, offset, templates):
             xml.append(record_xml)
         except UnicodeEncodeError:
             logger.info("Unicode encoding issue processing record at %s" % \
-                            hex(record.offset()))
+                        hex(record.offset()))
             continue
         except UnicodeDecodeError:
             logger.info("Unicode decoding issue processing record at %s" % \
-                            hex(record.offset()))
+                        hex(record.offset()))
             continue
         except InvalidRecordException:
             logger.info("EVTX parsing issue processing record at %s" % \
-                            hex(record.offset()))
+                        hex(record.offset()))
             continue
         except Exception as e:
             logger.info("Unknown exception processing record at %s: %s" % \
-                            (hex(record.offset()), str(e)))
+                        (hex(record.offset()), str(e)))
             raise e
             continue
     return "\n".join(xml)
@@ -136,6 +163,7 @@ def extract_chunk(buf, offset, templates):
 
 def main():
     import argparse
+
     parser = argparse.ArgumentParser(
         description="Find offsets of EVTX chunk records.")
     parser.add_argument("--records_outfile", type=str, default="records.xml",
@@ -149,7 +177,7 @@ def main():
                         help="Path to the Windows EVTX file")
     parser.add_argument("chunk_hits_file", type=str,
                         help="Path to the file containing output of"
-                        " find_evtx_chunks.py")
+                             " find_evtx_chunks.py")
     args = parser.parse_args()
 
     if args.verbose:

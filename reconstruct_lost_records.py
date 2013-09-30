@@ -88,7 +88,6 @@ def main():
                     substitutions.append((index, type_, substitution))
                 substitutions = sorted(substitutions, key=lambda p: p[0])
 
-
                 try:
                     logger.debug("Fetching template for EID: %d num_subs: %d" % (eid, len(substitutions)))
                     template = templates.get_template(eid, substitutions,

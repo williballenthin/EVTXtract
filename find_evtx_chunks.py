@@ -25,39 +25,43 @@ import struct
 from Evtx.Evtx import ChunkHeader
 from Evtx.BinaryParser import OverrunBufferException
 
+EVTX_HEADER_MAGIC = "ElfChnk"
 
-def offset_seems_like_chunk_header(buf, offset):
+
+def does_offset_seems_like_chunk_header(buf, offset):
     """
     Return True if the offset appears to be an EVTX Chunk header.
+    Implementation note: Simply checks the magic header and size field for reasonable values.
 
     @type buf: bytestring
     @type offset: int
     @rtype boolean
     """
     logger = logging.getLogger("find_evtx_chunks")
-    logger.debug("Checking for a chunk at %s", hex(offset))
+    logger.debug("Chunk header check: Checking for a chunk at %s", hex(offset))
     try:
-        if struct.unpack_from("<7s", buf, offset)[0] != "ElfChnk":
-            logger.debug("Bad magic")
+        if struct.unpack_from("<7s", buf, offset)[0] != EVTX_HEADER_MAGIC:
+            logger.debug("Chunk header check: Failed: Bad magic")
             return False
         if not (0x80 <= struct.unpack_from("<I", buf, offset + 0x28)[0] <= 0x200):
-            logger.debug("Bad size")
+            logger.debug("Chunk header check: Failed: Bad size")
             return False
     except OverrunBufferException:
-        logger.debug("Bad buffer size")
+        logger.debug("Chunk header check: Failed: Bad buffer size")
         return False
-    logger.debug("Looks good")
+    logger.debug("Chunk header check: Success")
     return True
 
 
+#noinspection PyClassHasNoInit,PyPep8Naming
 class CHUNK_HIT_TYPE:
     """
     Enumeration of types of chunk hits.
     """
-    CHUNK_VALID = 0
-    CHUNK_BAD_HEADER = 1
-    CHUNK_BAD_DATA = 2
-    CHUNK_BAD_SIZE = 3
+    CHUNK_VALID = 0       # The chunk appears to be valid
+    CHUNK_BAD_HEADER = 1  # The chunk has a bad header valid
+    CHUNK_BAD_DATA = 2    # The chunk's data checksum does not validate
+    CHUNK_BAD_SIZE = 3    # The chunk's data has the wrong size
 
 
 def find_evtx_chunks(buf):
@@ -67,24 +71,20 @@ def find_evtx_chunks(buf):
     @type buf: bytestring
     @rtype: generator of (int, int)
     """
-    logger = logging.getLogger("find_evtx_chunks")
-    index = buf.find("ElfChnk")
+    index = buf.find(EVTX_HEADER_MAGIC)
     while index != -1:
-        if not offset_seems_like_chunk_header(buf, index):
-            index = buf.find("ElfChnk", index + 1)
-            continue
-        chunk = ChunkHeader(buf, index)
+        if does_offset_seems_like_chunk_header(buf, index):
+            chunk = ChunkHeader(buf, index)
 
-        if len(buf) - index < 0x10000:
-            logger.debug("Bad size")
-            yield (CHUNK_HIT_TYPE.CHUNK_BAD_SIZE, index)
-        elif chunk.calculate_header_checksum() != chunk.header_checksum():
-            yield (CHUNK_HIT_TYPE.CHUNK_BAD_HEADER, index)
-        elif chunk.calculate_data_checksum() != chunk.data_checksum():
-            yield (CHUNK_HIT_TYPE.CHUNK_BAD_DATA, index)
-        else:
-            yield (CHUNK_HIT_TYPE.CHUNK_VALID, index)
-        index = buf.find("ElfChnk", index + 1)
+            if len(buf) - index < 0x10000:
+                yield (CHUNK_HIT_TYPE.CHUNK_BAD_SIZE, index)
+            elif chunk.calculate_header_checksum() != chunk.header_checksum():
+                yield (CHUNK_HIT_TYPE.CHUNK_BAD_HEADER, index)
+            elif chunk.calculate_data_checksum() != chunk.data_checksum():
+                yield (CHUNK_HIT_TYPE.CHUNK_BAD_DATA, index)
+            else:
+                yield (CHUNK_HIT_TYPE.CHUNK_VALID, index)
+        index = buf.find(EVTX_HEADER_MAGIC, index + 1)
 
 
 def main():

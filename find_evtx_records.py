@@ -27,7 +27,10 @@ from Evtx.Evtx import ChunkHeader
 from Evtx.BinaryParser import OverrunBufferException
 
 
-def offset_seems_like_record(buf, offset):
+EVTX_RECORD_MAGIC = "\x2a\x2a\x00\x00"
+
+
+def does_offset_seems_like_record(buf, offset):
     """
     Return True if the offset appears to be an EVTX record.
 
@@ -36,27 +39,27 @@ def offset_seems_like_record(buf, offset):
     @rtype boolean
     """
     logger = logging.getLogger("find_evtx_records")
-    logger.debug("Checking for a record at %s", hex(offset))
+    logger.debug("Record header check: Checking for a record at %s", hex(offset))
     try:
         magic, size = struct.unpack_from("<II", buf, offset)
         if magic != 0x00002a2a:
-            logger.debug("Bad magic")
+            logger.debug("Record header check: Failed: Bad magic")
             return False
         if not (0x30 <= size <= 0x10000):
-            logger.debug("Bad size")
+            logger.debug("Record header check: Failed: Bad size")
             return False
         try:
             size2 = struct.unpack_from("<I", buf, offset + size - 4)[0]
         except struct.error:
-            logger.debug("Bad buffer size")
+            logger.debug("Record header check: Failed: Bad buffer size")
             return False
         if size != size2:
-            logger.debug("Bad size2 (%s vs %s)", hex(size), hex(size2))
+            logger.debug("Record header check: Failed: Bad size2 (%s vs %s)", hex(size), hex(size2))
             return False
     except OverrunBufferException:
-        logger.debug("Bad buffer size")
+        logger.debug("Record header check: Failed: Bad buffer size")
         return False
-    logger.debug("Looks good")
+    logger.debug("Record header check: Success")
     return True
 
 
@@ -75,11 +78,11 @@ def find_lost_evtx_records(buf, ranges):
         start, end = range_
         logger.debug("Searching for records in the range (%s, %s)",
                      hex(start), hex(end))
-        index = buf.find("\x2a\x2a\x00\x00", start, end)
+        index = buf.find(EVTX_RECORD_MAGIC, start, end)
         while index != -1:
-            if offset_seems_like_record(buf, index):
+            if does_offset_seems_like_record(buf, index):
                 yield index
-            index = buf.find("\x2a\x2a\x00\x00", index + 1, end)
+            index = buf.find(EVTX_RECORD_MAGIC, index + 1, end)
 
 
 def main():
@@ -98,6 +101,7 @@ def main():
         logging.basicConfig(level=logging.DEBUG,
                             format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
+    # Construct a list of byte ranges that do not fall within the valid chunks
     ranges = []
     with open(args.chunk_list, "rb") as f:
         range_start = 0
@@ -109,7 +113,7 @@ def main():
                 ranges.append((range_start, offset))
                 range_start = offset + 0x10000
         # TODO(wb): is os.stat platform dependent?
-        ranges.append((range_start, os.stat(args.evtx).st_size))
+        ranges.append((range_start, os.stat(args.evtx).st_size))  # from here to end of file
 
     with open(args.evtx, "rb") as f:
         with contextlib.closing(mmap.mmap(f.fileno(), 0,
