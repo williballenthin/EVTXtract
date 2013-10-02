@@ -34,4 +34,95 @@ Algorithm
 
 TODO
 ----
-1. Consider to start using pretty-printed JSON files for the database format?
+1. DONE fix valid_record xml
+2. DONE fix bug parsing chunks and records for valid records/templates
+3. DONE ensure templates are not duplicated in the database
+4. Figure out what happens with multiple runs on different files
+     --> they must match, or the offsets will get screwed up
+     --> therefore, the bug is to warn if the files differ, or if data already exists
+5. DONE Logging issue
+    Git/recover-evtx - [json-db\u25cf] \u00bb python extract_valid_evtx_records_and_templates.py tests/working-private/chunk_fragment/chunk_fragment.evtx
+      No handlers could be found for logger "extract_records"
+6. DONE Move argparser config to common area
+7. figure out idempotency for state, related: #4
+8. consider GZIPing the state and database files
+9. write dumping scripts
+10. DONE implement .get_template
+11. DONE figure out where IDs should be used --> nowhere
+12. DONE move things out of main
+13. consider writing a Q&A/wizard style interface
+14. develop flowchart describing usage
+15. DONE for state/db file, on error, should the existing state be written out best-effort?
+16. DONE Template.get_id is broken, only returns EID
+17. DONE if project name specified, update the templatedb default
+18. DONE templatedb filename should always end in _db.json
+19. extract constraints in template DB for easy matching
+20. add status output so the user knows that something happened. Use print() for this, not logging
+21. DONE make substitution object/list things consistent. 2- or 3-tuples?
+22. DONE nested template indices are incorrect. seems to be a string concat somewhere
+
+
+JSON format
+-----------
+## State file
+{
+  version: int
+  generator: str
+
+  // metadata, for confirmation after the fact
+  input_file: {
+    size: int
+    md5: str    // hex encoded md5sum of the first 0x100000 bytes of the input file
+  }
+
+  valid_chunk_offsets: [int, int, ...]
+  potential_record_offsets: [int, int, ...]
+  valid_records: [
+    {
+      offset: int
+      eid: int
+      xml: str
+    },
+    ...
+  }
+  lost_records: [
+    {
+      offset: int
+      substitutions: [(str, str), (str, str), ...]
+    },
+    ...
+  ]
+  reconstructed_records: [
+    {
+      offset: int
+      eid: int
+      xml: str
+    },
+    ...
+  ]
+  unreconstructed_records: [
+    {
+      offset: int
+      substitutions: [(str, str), (str, str), ...]
+      reason: str
+    },
+    ...
+  ]
+}
+
+## Template File
+{
+  version: int
+  generator: str
+
+  templates: {
+    (int)eid: [
+      {
+        eid: int,
+        id: str,
+        xml: str,
+      },
+      ...
+    ]
+  }
+}

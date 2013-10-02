@@ -19,10 +19,12 @@
 #   Version v0.1
 import struct
 import logging
-import mmap
-import contextlib
 from datetime import datetime
+from Progress import NullProgress
+from State import State
+from recovery_utils import Mmap, do_common_argparse_config
 
+logger = logging.getLogger("extract_lost_records")
 
 valid_substitution_types = [False for _ in xrange(256)]
 for i in xrange(22):
@@ -329,7 +331,6 @@ def extract_lost_record(buf, offset):
     @type offset: int
     @rtype: dict
     """
-    logger = logging.getLogger("extract_lost_records")
     record_size, record_num, qword = struct.unpack_from("<IQQ", buf, offset + 0x4)
     timestamp = datetime.utcfromtimestamp(float(qword) * 1e-7 - 11644473600)
     logger.debug("Extracting lost node at %s, num %s, time %se",
@@ -345,76 +346,36 @@ def extract_lost_record(buf, offset):
     }
 
 
-def format_record(record):
+def extract_lost_evtx_records(state, buf, progress_class=NullProgress):
     """
-    Turn a Record dict into a readable string.
-
-    @type record: dict
-    @rtype: str
+    @rtype: (int, int)
+    @return: num_extracted, num_failures
     """
-    ret = ["RECORD", "offset: %s" % hex(record["offset"]),
-           "timestamp: %s" % record["timestamp"].isoformat("T") + "Z",
-           "record_num: %s" % record["record_num"],
-           "EID: %s" % record["substitutions"][3][1]]
-    for i, pair in enumerate(record["substitutions"]):
-        type_, value = pair
-        val_str = None
-        if type_ == 0x81:  # wstring array
-            val_str = ", ".join(value)
-        elif type_ == 0x11 or type_ == 0x12:
-            val_str = value.isoformat("T") + "Z"
-        else:
-            val_str = str(value)
-        ret.append("substitution-%i (%s): %s" % (i, hex(type_), val_str))
-    return u"\n".join(ret)
+    num_extracted = 0
+    num_failures = 0
+    progress = progress_class(len(state.get_potential_record_offsets()) - 1)
+    for i, record_offset in enumerate(state.get_potential_record_offsets()):
+        try:
+            record = extract_lost_record(buf, record_offset)
+            state.add_lost_record(record_offset, record["timestamp"], record["record_num"], record["substitutions"])
+            num_extracted += 1
+        except Exception:
+            logging.warning("Exception encountered processing lost record at %s", hex(record_offset), exc_info=True)
+            num_failures += 1
+        progress.set_current(i)
+    progress.set_complete()
+    return num_extracted, num_failures
 
 
 def main():
-    import argparse
+    args = do_common_argparse_config("Extract lost EVTX records")
 
-    parser = argparse.ArgumentParser(
-        description="Extract lost EVTX records.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable debugging output")
-    parser.add_argument("evtx", type=str,
-                        help="Path to the Windows EVTX file")
-    parser.add_argument("records_list", type=str,
-                        help="The path to the file containing a list of "
-                             "record offsets")
-    args = parser.parse_args()
+    with State(args.project_json) as state:
+        with Mmap(args.image) as buf:
+            num_extracted, num_failures = extract_lost_evtx_records(state, buf, args.progress_class)
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format="# %(asctime)s %(levelname)s %(name)s %(message)s")
-
-    logger = logging.getLogger("extract_lost_records")
-
-    num_extracted = 0
-    num_failures = 0
-    with open(args.evtx, "rb") as f:
-        with contextlib.closing(mmap.mmap(f.fileno(), 0,
-                                          access=mmap.ACCESS_READ)) as buf:
-            with open(args.records_list, "rb") as g:
-                for line in g.read().split("\n"):
-                    hit_type, _, offset = line.partition("\t")
-                    offset = offset.rstrip("L\r")
-                    logger.debug("Processing line: %s, %s", hit_type, offset)
-                    if hit_type != "LOST_RECORD":
-                        logging.debug("Skipping, cause its not a lost record")
-                        continue
-                    offset = int(offset, 0x10)
-                    try:
-                        record = extract_lost_record(buf, offset)
-                        print format_record(record)
-                        print "\n"
-                        num_extracted += 1
-                    except Exception:
-                        logging.warning("Exception encountered processing lost record at %s", hex(offset),
-                                        exc_info=True)
-                        num_failures += 1
-
-    print("# Number of extracted records: %d" % num_extracted)
-    print("# Number of failed record extractions: %d" % num_failures)
+    logger.info("Number of extracted records: %d",  num_extracted)
+    logger.info("Number of failed record extractions: %d", num_failures)
 
 
 if __name__ == "__main__":

@@ -18,99 +18,55 @@
 #
 #   Version v0.1
 import logging
+from Progress import NullProgress
+from State import State
+from TemplateDatabase import TemplateEIDConflictError, TemplateNotFoundError, TemplateDatabase
 
-from recovery_utils import TemplateDatabase
-from recovery_utils import TemplateEIDConflictError
-from recovery_utils import TemplateNotFoundError
+from recovery_utils import do_common_argparse_config
+
+logger = logging.getLogger("reconstruct_lost_records")
+
+
+def reconstruct_lost_records(state, templates, progress_class=NullProgress):
+    """
+    @type state: State
+    @type templates: TemplateDatabase
+    @rtype: (int, int)
+    @return: The number of reconstructed records, and the number of unreconstructed records.
+    """
+    num_reconstructed = 0
+    num_unreconstructed = 0
+    progress = progress_class(len(state.get_lost_records()))
+    for i, lost_record in enumerate(state.get_lost_records()):
+        progress.set_current(i)
+        eid = lost_record["substitutions"][3][1]
+        try:
+            logger.debug("Fetching template for record %d with EID: %d num_subs: %d" %
+                         (lost_record["record_num"], eid, len(lost_record["substitutions"])))
+            template = templates.get_template(eid, lost_record["substitutions"])
+        except TemplateEIDConflictError as e:
+            state.add_unreconstructed_record(lost_record["offset"], lost_record["substitutions"], str(e))
+            num_unreconstructed += 1
+            logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
+            continue
+        except TemplateNotFoundError as e:
+            state.add_unreconstructed_record(lost_record["offset"], lost_record["substitutions"], str(e))
+            num_unreconstructed += 1
+            logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
+            continue
+        subs = map(lambda s: (s[0], str(s[1])), lost_record["substitutions"])
+        state.add_reconstructed_record(lost_record["offset"], eid, template.insert_substitutions(subs))
+        num_reconstructed += 1
+        logger.debug("Reconstructed record with EID %d", eid)
+    progress.set_complete()
+    return num_reconstructed, num_unreconstructed
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Reconstruct lost EVTX records using recovered templates.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable debugging output")
-    parser.add_argument("--assume_first_template", action="store_true",
-                        help="Assume first template with ID in file matches."
-                        " Warning: Not for forensics.")
-    parser.add_argument("templates", type=str,
-                        help="Path to the file containing recovered templates")
-    parser.add_argument("records", type=str,
-                        help="Path to the file containing recovered records")
-    parser.add_argument("reconstructed_outfile", type=str,
-                        default="reconstructed_records.xml",
-                        help="Path to the file that will contain "
-                        "reconstructed records")
-    parser.add_argument("unreconstructed_outfile", type=str,
-                        default="unreconstructed_records.txt",
-                        help="Path to the file that will contain "
-                        "unreconstructed records")
-    args = parser.parse_args()
-
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format="# %(asctime)s %(levelname)s %(name)s %(message)s")
-
-    logger = logging.getLogger("reconstruct_lost_records")
-
-    with open(args.templates, "rb") as f:
-        templates_txt = f.read()
-    templates = TemplateDatabase()
-    templates.deserialize(templates_txt,
-                          warn_on_conflict=not args.assume_first_template)
-
-    with open(args.records, "rb") as f:
-        records_txt = f.read()
-
-    num_reconstructed = 0
-    num_unreconstructed = 0
-    with open(args.reconstructed_outfile, "wb") as fixed:
-        fixed.write("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>")
-        fixed.write("<Events>")
-        with open(args.unreconstructed_outfile, "wb") as unfixed:
-            for record_txt in records_txt.split("RECORD\n"):
-                if record_txt == "" or "EID" not in record_txt:
-                    continue
-
-                record_lines = record_txt.split("\n")
-                eid_line = record_lines[3]
-                _, __, eid = eid_line.partition(": ")
-                eid = eid.rstrip("\r")
-                eid = int(eid)
-
-                substitutions = []
-                for substitution_line in record_lines[4:]:
-                    if "substitution" not in substitution_line:
-                        continue
-                    index = int(substitution_line.partition("-")[2].partition(" ")[0])
-                    type_ = int(substitution_line.partition("(")[2].partition(")")[0], 0x10)
-                    substitution = substitution_line.partition(": ")[2]
-                    substitutions.append((index, type_, substitution))
-                substitutions = sorted(substitutions, key=lambda p: p[0])
-
-                try:
-                    logger.debug("Fetching template for EID: %d num_subs: %d" % (eid, len(substitutions)))
-                    template = templates.get_template(eid, substitutions,
-                                                      exact_match=not args.assume_first_template)
-                except TemplateEIDConflictError as e:
-                    unfixed.write("RECORD\n")
-                    unfixed.write("Reason: %s\n" % str(e))
-                    unfixed.write(record_txt)
-                    num_unreconstructed += 1
-                    logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
-                    continue
-                except TemplateNotFoundError as e:
-                    unfixed.write("RECORD\n")
-                    unfixed.write("Reason: %s\n" % str(e))
-                    unfixed.write(record_txt)
-                    num_unreconstructed += 1
-                    logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
-                    continue
-                fixed.write(template.insert_substitutions(substitutions))
-                num_reconstructed += 1
-                logger.debug("Reconstructed record with EID %d", eid)
-        fixed.write("</Events>")
-
+    args = do_common_argparse_config("Reconstruct lost EVTX records using recovered templates.")
+    with State(args.project_json) as state:
+        with TemplateDatabase(args.templates_json) as templates:
+            num_reconstructed, num_unreconstructed = reconstruct_lost_records(state, templates, progress_class=args.progress_class)
     print("# Number of reconstructed records: %d" % num_reconstructed)
     print("# Number of records unable to reconstruct: %d" % num_unreconstructed)
 

@@ -17,28 +17,25 @@
 #   limitations under the License.
 #
 #   Version v0.1
-import os
 import re
-import sys
-import mmap
 import logging
-import contextlib
+from Evtx.BinaryParser import hex_dump
 
 from Evtx.Evtx import ChunkHeader
-from Evtx.Nodes import BXmlTypeNode
+from Evtx.Nodes import BXmlTypeNode, EndOfStreamNode, OpenStartElementNode, AttributeNode, CloseStartElementNode, CloseEmptyElementNode, CloseElementNode, ValueNode, CDataSectionNode, EntityReferenceNode, ProcessingInstructionTargetNode, ProcessingInstructionDataNode, TemplateInstanceNode, NormalSubstitutionNode, ConditionalSubstitutionNode, StreamStartNode, TemplateNode
 from Evtx.Evtx import InvalidRecordException
-from Evtx.Views import evtx_template_readable_view
-from Evtx.Views import evtx_record_xml_view
+from Evtx.Views import evtx_record_xml_view, UnexpectedElementException
+from Progress import NullProgress
+from State import State
+from TemplateDatabase import TemplateDatabase
+from TemplateDatabase import Template
 
-from recovery_utils import get_eid
-from recovery_utils import Template
-from recovery_utils import TemplateDatabase
+from recovery_utils import get_eid, Mmap, do_common_argparse_config
 
+logger = logging.getLogger("extract_records")
 
 _replacement_patterns = {i: re.compile("\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % i) for i in
                          xrange(35)}
-
-
 def _make_replacement(template, index, substitution):
     """
     Makes a substitution given a template as a string.
@@ -57,8 +54,68 @@ def _make_replacement(template, index, substitution):
     return _replacement_patterns[index].sub(substitution, template)
 
 
-_index_strings = {i: "index=%d" % i for i in xrange(35)}
+def evtx_template_readable_view(root_node, cache=0):
+    def rec(node, acc):
+        if isinstance(node, EndOfStreamNode):
+            pass  # intended
+        elif isinstance(node, OpenStartElementNode):
+            acc.append("<")
+            acc.append(node.tag_name())
+            for child in node.children():
+                if isinstance(child, AttributeNode):
+                    acc.append(" ")
+                    acc.append(child.attribute_name().string())
+                    acc.append("=\"")
+                    rec(child.attribute_value(), acc)
+                    acc.append("\"")
+            acc.append(">")
+            for child in node.children():
+                rec(child, acc)
+            acc.append("</")
+            acc.append(node.tag_name())
+            acc.append(">\n")
+        elif isinstance(node, CloseStartElementNode):
+            pass  # intended
+        elif isinstance(node, CloseEmptyElementNode):
+            pass  # intended
+        elif isinstance(node, CloseElementNode):
+            pass  # intended
+        elif isinstance(node, ValueNode):
+            acc.append(node.children()[0].string())
+        elif isinstance(node, AttributeNode):
+            pass  # intended
+        elif isinstance(node, CDataSectionNode):
+            acc.append("<![CDATA[")
+            acc.append(node.cdata())
+            acc.append("]]>")
+        elif isinstance(node, EntityReferenceNode):
+            acc.append(node.entity_reference())
+        elif isinstance(node, ProcessingInstructionTargetNode):
+            acc.append(node.processing_instruction_target())
+        elif isinstance(node, ProcessingInstructionDataNode):
+            acc.append(node.string())
+        elif isinstance(node, TemplateInstanceNode):
+            raise UnexpectedElementException("TemplateInstanceNode")
+        elif isinstance(node, NormalSubstitutionNode):
+            acc.append("[Normal Substitution(index=%d, type=%d)]" % \
+                           (node.index(), node.type()))
+        elif isinstance(node, ConditionalSubstitutionNode):
+            acc.append("[Conditional Substitution(index=%d, type=%d)]" % \
+                           (node.index(), node.type()))
+        elif isinstance(node, StreamStartNode):
+            pass  # intended
 
+    # TODO(wb): reeval this
+    acc = []
+    template_instance = root_node.fast_template_instance()
+    templ_off = template_instance.template_offset() + template_instance._chunk.offset()
+    node = TemplateNode(template_instance._buf, templ_off, template_instance._chunk, template_instance)
+    sub_acc = []
+    for c in node.children():
+        rec(c, sub_acc)
+    sub_templ = "".join(sub_acc)
+    acc.append(sub_templ)
+    return "".join(acc)
 
 def _get_complete_template(root, current_index=0):
     """
@@ -73,7 +130,7 @@ def _get_complete_template(root, current_index=0):
     @type current_index: int
     @rtype: str
     """
-    template = evtx_template_readable_view(root)
+    template = evtx_template_readable_view(root)  # TODO(wb): make sure this is working
 
     # walk through each substitution.
     # if its a normal node, continue
@@ -85,6 +142,7 @@ def _get_complete_template(root, current_index=0):
         if not isinstance(substitution, BXmlTypeNode):
             replacements.append(current_index + index)
             continue
+        # TODO(wb): hack here accessing ._root
         subtemplate = _get_complete_template(substitution._root,
                                              current_index=current_index + index)
         replacements.append(subtemplate)
@@ -95,9 +153,9 @@ def _get_complete_template(root, current_index=0):
     for i, replacement in enumerate(replacements):
         index = len(replacements) - i - 1
         if isinstance(replacement, int):
-            # fixup index                             # cached:
-            from_pattern = _index_strings[index]      # "index=%d" % index
-            to_pattern = _index_strings[replacement]  # "index=%d" % replacement
+            # fixup index
+            from_pattern = "index=%d," % index
+            to_pattern = "index=%d," % replacement
             template = template.replace(from_pattern, to_pattern)
         if isinstance(replacement, basestring):
             # insert sub-template
@@ -115,32 +173,40 @@ def get_template(record, record_xml):
     @rtype: Template
     """
     template = _get_complete_template(record.root())
-    return Template(get_eid(record_xml), template, record.offset())
+    return Template(int(get_eid(record_xml)), template)
 
 
-def extract_chunk(buf, offset, templates):
+def extract_chunk(buf, offset, state, templates):
     """
-    Parse an EVTX chunk into the XML entries
-      and extract the templates into a TemplateDatabase
+    Parse an EVTX chunk
+      updating the State with new valid records, and
+      extracting the templates into a TemplateDatabase.
 
-    Modifies parameter `templates`.
+    @sideeffect: parameter `templates`
+    @sideeffect: parameter `state`
 
     @type buf: bytestring
     @type offset: int
+    @type state: State
     @type templates: TemplateDatabase
-    @rtype: str
     """
-    logger = logging.getLogger("extract_records")
+    logger.debug("Considering chunk at offset %d", offset)
+
     chunk = ChunkHeader(buf, offset)
 
     xml = []
     cache = {}
     for record in chunk.records():
         try:
+            offset = record.offset()
+            logger.debug("Considering record at offset %d",  offset)
             record_xml = evtx_record_xml_view(record, cache=cache)
+            eid = get_eid(record_xml)
+
+            state.add_valid_record(offset, eid, record_xml)
+
             template = get_template(record, record_xml)
             templates.add_template(template)
-            xml.append(record_xml)
         except UnicodeEncodeError:
             logger.info("Unicode encoding issue processing record at %s" % \
                         hex(record.offset()))
@@ -158,88 +224,26 @@ def extract_chunk(buf, offset, templates):
                         (hex(record.offset()), str(e)))
             raise e
             continue
-    return "\n".join(xml)
+
+
+def extract_valid_evtx_records_and_templates(state, templates, buf, progress_class=NullProgress):
+    progress = progress_class(len(state.get_valid_chunk_offsets()) - 1)
+    for i, chunk_offset in enumerate(state.get_valid_chunk_offsets()):
+        extract_chunk(buf, chunk_offset, state, templates)
+        progress.set_current(i)
+    progress.set_complete()
 
 
 def main():
-    import argparse
+    args = do_common_argparse_config("Extract valid EVTX records and templates.")
 
-    parser = argparse.ArgumentParser(
-        description="Find offsets of EVTX chunk records.")
-    parser.add_argument("--records_outfile", type=str, default="records.xml",
-                        help="The path to the output file for records")
-    parser.add_argument("--templates_outfile", type=str,
-                        default="templates.txt",
-                        help="The path to the output file for templates")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable debugging output")
-    parser.add_argument("evtx", type=str,
-                        help="Path to the Windows EVTX file")
-    parser.add_argument("chunk_hits_file", type=str,
-                        help="Path to the file containing output of"
-                             " find_evtx_chunks.py")
-    args = parser.parse_args()
-
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format="%(asctime)s %(levelname)s %(name)s %(message)s")
-
-    logger = logging.getLogger("extract_records")
-
-    with open(args.evtx, "rb") as f:
-        with contextlib.closing(mmap.mmap(f.fileno(), 0,
-                                          access=mmap.ACCESS_READ)) as buf:
-            xml = []
-            templates = TemplateDatabase()
-            if os.path.exists(args.templates_outfile):
-                with open(args.templates_outfile) as g:
-                    try:
-                        templates.deserialize(g.read())
-                    except Exception as e:
-                        logging.critical("Exception parsing existing templates file: %s", str(e))
-                        sys.exit(-1)
-
-            with open(args.chunk_hits_file, "rb") as g:
-                for line in g.read().split("\n"):
-                    hit_type, _, offset = line.partition("\t")
-                    logger.debug("Processing line: %s, %s", hit_type, offset)
-                    if hit_type != "CHUNK_VALID":
-                        logging.debug("Skipping, cause its not a valid chunk")
-                        continue
-                    offset = offset.rstrip("L\r")
-                    offset = int(offset, 0x10)
-                    xml.append(extract_chunk(buf, offset, templates))
-
-    xml_header = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>"
-    events_start = "<Events>"
-    events_end = "</Events>"
-    should_append = False
-    if os.path.exists(args.records_outfile):
-        should_append = True
-        with open(args.records_outfile, "rb") as f:
-            lines = f.read().split("\n")
-            if len(lines) < 3:
-                should_append = False
-            if lines[0] != xml_header:
-                should_append = False
-            if len(lines) > 1 and lines[1] != events_start:
-                should_append = False
-            if lines[-1] != events_end:
-                should_append = False
-    if should_append:
-        with open(args.records_outfile, "wb") as f:
-            for line in lines[:-2]:
-                f.write(line)
-            f.write("\n".join(xml))
-            f.write(events_end)
-    else:
-        with open(args.records_outfile, "wb") as f:
-            f.write(xml_header + "\n")
-            f.write(events_start + "\n")
-            f.write("\n".join(xml))
-            f.write(events_end)
-    with open(args.templates_outfile, "wb") as f:
-        f.write(templates.serialize())
+    with State(args.project_json) as state:
+        if len(state.get_valid_chunk_offsets()) == 0:
+            logger.warn("No valid chunk offsets recorded. Perhaps you haven't yet run find_evtx_chunks?")
+            return
+        with TemplateDatabase(args.templates_json) as templates:
+            with Mmap(args.image) as buf:
+                extract_valid_evtx_records_and_templates(state, templates, buf, progress_class=args.progress_class)
 
 
 if __name__ == "__main__":

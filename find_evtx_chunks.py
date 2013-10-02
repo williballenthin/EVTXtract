@@ -18,14 +18,16 @@
 #
 #   Version v0.1
 import logging
-import mmap
-import contextlib
 import struct
 
 from Evtx.Evtx import ChunkHeader
 from Evtx.BinaryParser import OverrunBufferException
+from Progress import NullProgress
+from State import State
+from recovery_utils import Mmap, do_common_argparse_config
 
 EVTX_HEADER_MAGIC = "ElfChnk"
+logger = logging.getLogger("find_evtx_chunks")
 
 
 def does_offset_seems_like_chunk_header(buf, offset):
@@ -37,7 +39,6 @@ def does_offset_seems_like_chunk_header(buf, offset):
     @type offset: int
     @rtype boolean
     """
-    logger = logging.getLogger("find_evtx_chunks")
     logger.debug("Chunk header check: Checking for a chunk at %s", hex(offset))
     try:
         if struct.unpack_from("<7s", buf, offset)[0] != EVTX_HEADER_MAGIC:
@@ -53,67 +54,39 @@ def does_offset_seems_like_chunk_header(buf, offset):
     return True
 
 
-#noinspection PyClassHasNoInit,PyPep8Naming
-class CHUNK_HIT_TYPE:
+def find_evtx_chunks(state, buf, progress_class=NullProgress):
     """
-    Enumeration of types of chunk hits.
-    """
-    CHUNK_VALID = 0       # The chunk appears to be valid
-    CHUNK_BAD_HEADER = 1  # The chunk has a bad header valid
-    CHUNK_BAD_DATA = 2    # The chunk's data checksum does not validate
-    CHUNK_BAD_SIZE = 3    # The chunk's data has the wrong size
+    Scans the given data for valid EVTX chunk structures and adds the offsets
+      to the State instance.
 
-
-def find_evtx_chunks(buf):
-    """
-    Generates tuples (CHUNK_HIT_TYPE, offset) from the given buffer.
-
+    @type state: State
     @type buf: bytestring
     @rtype: generator of (int, int)
     """
+    progress = progress_class(len(buf))
     index = buf.find(EVTX_HEADER_MAGIC)
     while index != -1:
+        progress.set_current(index)
         if does_offset_seems_like_chunk_header(buf, index):
             chunk = ChunkHeader(buf, index)
-
             if len(buf) - index < 0x10000:
-                yield (CHUNK_HIT_TYPE.CHUNK_BAD_SIZE, index)
+                logger.debug("%s\t%s" % ("CHUNK_BAD_SIZE", hex(index)))
             elif chunk.calculate_header_checksum() != chunk.header_checksum():
-                yield (CHUNK_HIT_TYPE.CHUNK_BAD_HEADER, index)
+                logger.debug("%s\t%s" % ("CHUNK_BAD_HEADER", hex(index)))
             elif chunk.calculate_data_checksum() != chunk.data_checksum():
-                yield (CHUNK_HIT_TYPE.CHUNK_BAD_DATA, index)
+                logger.debug("%s\t%s" % ("CHUNK_BAD_DATA", hex(index)))
             else:
-                yield (CHUNK_HIT_TYPE.CHUNK_VALID, index)
+                state.add_valid_chunk_offset(index)
         index = buf.find(EVTX_HEADER_MAGIC, index + 1)
+    progress.set_complete()
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Find offsets of EVTX chunk headers.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable debug logging.")
-    parser.add_argument("evtx", type=str,
-                        help="Path to the Windows EVTX file")
-    args = parser.parse_args()
+    args = do_common_argparse_config("Find valid EVTX chunks.")
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-
-    with open(args.evtx, "rb") as f:
-        with contextlib.closing(mmap.mmap(f.fileno(), 0,
-                                          access=mmap.ACCESS_READ)) as buf:
-            for hit_type, offset in find_evtx_chunks(buf):
-                if hit_type == CHUNK_HIT_TYPE.CHUNK_BAD_HEADER:
-                    print("%s\t%s" % ("CHUNK_BAD_HEADER", hex(offset)))
-                elif hit_type == CHUNK_HIT_TYPE.CHUNK_BAD_DATA:
-                    print("%s\t%s" % ("CHUNK_BAD_DATA", hex(offset)))
-                elif hit_type == CHUNK_HIT_TYPE.CHUNK_BAD_SIZE:
-                    print("%s\t%s" % ("CHUNK_BAD_SIZE", hex(offset)))
-                elif hit_type == CHUNK_HIT_TYPE.CHUNK_VALID:
-                    print("%s\t%s" % ("CHUNK_VALID", hex(offset)))
-                else:
-                    raise "Unknown CHUNK_HIT_TYPE: %d" % hit_type
+    with State(args.project_json) as state:
+        with Mmap(args.image) as buf:
+            find_evtx_chunks(state, buf, progress_class=args.progress_class)
 
 if __name__ == "__main__":
     main()

@@ -19,14 +19,15 @@
 #   Version v0.1
 import os
 import logging
-import mmap
-import contextlib
 import struct
 
-from Evtx.Evtx import ChunkHeader
 from Evtx.BinaryParser import OverrunBufferException
+from Progress import NullProgress
+from State import State
+from recovery_utils import Mmap, do_common_argparse_config
 
 
+logger = logging.getLogger("find_evtx_records")
 EVTX_RECORD_MAGIC = "\x2a\x2a\x00\x00"
 
 
@@ -38,7 +39,6 @@ def does_offset_seems_like_record(buf, offset):
     @type offset: int
     @rtype boolean
     """
-    logger = logging.getLogger("find_evtx_records")
     logger.debug("Record header check: Checking for a record at %s", hex(offset))
     try:
         magic, size = struct.unpack_from("<II", buf, offset)
@@ -63,7 +63,7 @@ def does_offset_seems_like_record(buf, offset):
     return True
 
 
-def find_lost_evtx_records(buf, ranges):
+def find_lost_evtx_records(buf, ranges, progress_class=NullProgress):
     """
     Generates offsets of apparent EVTX records from the given buffer
       that fall within the given ranges.
@@ -72,54 +72,36 @@ def find_lost_evtx_records(buf, ranges):
     @type ranges: list of (int, int)
     @rtype: generator of int
     """
-    logger = logging.getLogger("find_evtx_records")
+    progress = progress_class(len(buf))
     for range_ in ranges:
-
         start, end = range_
         logger.debug("Searching for records in the range (%s, %s)",
                      hex(start), hex(end))
         index = buf.find(EVTX_RECORD_MAGIC, start, end)
         while index != -1:
+            progress.set_current(index)
             if does_offset_seems_like_record(buf, index):
                 yield index
             index = buf.find(EVTX_RECORD_MAGIC, index + 1, end)
+        progress.set_complete()
 
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Find offsets of EVTX records.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable debug logging.")
-    parser.add_argument("evtx", type=str,
-                        help="Path to the Windows EVTX file")
-    parser.add_argument("chunk_list", type=str,
-                        help="Path to the file containing list of chunks")
-    args = parser.parse_args()
+    args = do_common_argparse_config("Find offsets of EVTX records.")
 
-    if args.verbose:
-        logging.basicConfig(level=logging.DEBUG,
-                            format="%(asctime)s %(levelname)s %(name)s %(message)s")
-
-    # Construct a list of byte ranges that do not fall within the valid chunks
-    ranges = []
-    with open(args.chunk_list, "rb") as f:
+    with State(args.project_json) as state:
+        ranges = []
         range_start = 0
-        for line in f.read().split("\n"):
-            if "CHUNK_VALID" in line:
-                _, __, offset = line.partition("\t")
-                offset = offset.rstrip("L\r")
-                offset = int(offset, 0x10)
-                ranges.append((range_start, offset))
-                range_start = offset + 0x10000
-        # TODO(wb): is os.stat platform dependent?
-        ranges.append((range_start, os.stat(args.evtx).st_size))  # from here to end of file
+        for chunk_offset in state.get_valid_chunk_offsets():
+            ranges.append((range_start, chunk_offset))
+            range_start = chunk_offset + 0x10000
+        ranges.append((range_start, os.stat(args.image).st_size))  # from here to end of file
 
-    with open(args.evtx, "rb") as f:
-        with contextlib.closing(mmap.mmap(f.fileno(), 0,
-                                          access=mmap.ACCESS_READ)) as buf:
-            for offset in find_lost_evtx_records(buf, ranges):
-                print("%s\t%s" % ("LOST_RECORD", hex(offset)))
+        with Mmap(args.image) as buf:
+            for offset in find_lost_evtx_records(buf, ranges, progress_class=args.progress_class):
+                state.add_potential_record_offset(offset)
+
+
 
 
 if __name__ == "__main__":

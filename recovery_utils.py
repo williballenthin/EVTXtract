@@ -22,6 +22,8 @@ import logging
 
 # TODO(wb): fallback to standard xml parser
 from lxml import etree
+import mmap
+from Progress import NullProgress, ProgressBarProgress
 
 
 def to_lxml(record_xml):
@@ -62,288 +64,90 @@ def get_eid(record_xml):
     return get_child(get_child(to_lxml(record_xml), "System"), "EventID").text
 
 
-class Template(object):
-    substitition_re = re.compile("\[(Conditional|Normal) Substitution\(index=(\d+), type=(\d+)\)\]")
+class Mmap(object):
+    """
+    Convenience class for opening a read-only memory map for a file path.
+    """
+    def __init__(self, filename):
+        super(Mmap, self).__init__()
+        self._filename = filename
+        self._f = None
+        self._mmap = None
 
-    def __init__(self, eid, xml, offset):
-        self._eid = eid
-        self._xml = xml
-        self._offset = offset
+    def __enter__(self):
+        self._f = open(self._filename, "rb")
+        self._mmap = mmap.mmap(self._f.fileno(), 0, access=mmap.ACCESS_READ)
+        return self._mmap
 
-        self._cached_placeholders = None
-        self._cached_id = None
-
-    def get_xml(self):
-        return self._xml
-
-    def get_eid(self):
-        return self._eid
-
-    def get_id(self):
-        if self._cached_id is not None:
-            return self._cached_id
-        ret = ["%s" % self._eid]
-        for index, type_, mode in self._get_placeholders():
-            if mode:
-                mode_str = "c"
-            else:
-                mode_str = "n"
-            ret.append("[%s|%s|%s]" % (index, type_, mode_str))
-        self._cached_id = "-".join(ret)
-        return self._cached_id
-
-    def get_offset(self):
-        return self._offset
-
-    def _get_placeholders(self):
-        """
-        Get descriptors for each of the substitutions required by this
-          template.
-
-        Tuple schema: (index, type, is_conditional)
-
-        @rtype: list of (int, int, boolean)
-        """
-        if self._cached_placeholders is not None:
-            return self._cached_placeholders
-        ret = []
-        for mode, index, type_ in Template.substitition_re.findall(self._xml):
-            ret.append((int(index), int(type_), mode == "Conditional"))
-        self._cached_placeholders = sorted(ret, key=lambda p: p[0])
-        return self._cached_placeholders
-
-    def match_substitutions(self, substitutions):
-        """
-        Checks to see if the provided set of substitutions match the
-          placeholder values required by this template.
-
-        Note, this is only a best guess.  The number of substitutions
-          *may* be greater than the number of available slots. So we
-          must only check the slot and substitution types.
-
-        Tuple schema: (index, type, value)
-
-        @type substitutions: list of (int, int, str)
-        @rtype: boolean
-        """
-        logger = logging.getLogger("match_substitutions")
-        placeholders = self._get_placeholders()
-        if len(placeholders) > len(substitutions):
-            logger.debug("Failing on lens: %d vs %d",
-                         len(placeholders), len(substitutions))
-            return False
-        if max(placeholders, key=lambda k: k[0])[0] > max(substitutions, key=lambda k: k[0])[0]:
-            logger.debug("Failing on max index: %d vs %d",
-                         max(placeholders, key=lambda k: k[0])[0],
-                         max(substitutions, key=lambda k: k[0])[0])
-            return False
-        for index, type_, mode in placeholders:
-            sub = substitutions[index]
-            # substitutions should be sorted and index-able,
-            #  but if not, fallback
-            if sub[0] != index:
-                for s in substitutions:
-                    if s[0] == index:
-                        sub = s
-                        break
-            if mode and sub[1] == 0:
-                continue
-            if sub[1] != type_:
-                logger.debug("Failing on type comparison: %d vs %d (mode: %s)",
-                             sub[1], type_, mode)
-                return False
-        return True
-
-    escape_re = re.compile(r"\\\\(\d)")
-
-    @staticmethod
-    def _escape(value):
-        """
-        Escape the static value to be used in a regular expression
-          subsititution. This processes any backreferences and
-          makes them plain, escaped sequences.
-
-        @type value: str
-        @rtype: str
-        """
-        return Template.escape_re.sub(r"\\\\\\\\\1", re.escape(value))
-
-    def insert_substitutions(self, substitutions):
-        """
-        Return a copy of the template with the given substitutions inserted.
-
-        Implementation is a huge hack that depends on the
-        brittle template_format() output.
-
-        substitutions should be a list of (index:int, type:int, value:str)
-
-        @type substitutions: list of (int, int, str)
-        @rtype: str
-        """
-        ret = self._xml
-        for index, type_, value in substitutions:
-            from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-            ret = re.sub(from_pattern, Template._escape(value), ret)
-        return ret
-
-    def serialize(self):
-        ret = []
-        ret.append("TEMPLATE")
-        ret.append("ID: %s" % self.get_id())
-        ret.append("EID: %s" % self.get_eid())
-        ret.append("OFFSET: %s" % self.get_offset())
-        ret.append("%s" % self.get_xml())
-        return "\n".join(ret)
-
-    @classmethod
-    def deserialize(cls, text):
-        for requirement in ["TEMPLATE", "EID: ", "ID: ", "<Event "]:
-            if requirement not in text:
-                return None
-        template_lines = text.split("\n")
-        #template_line = template_lines[0]
-        id_line = template_lines[1]
-        eid_line = template_lines[2]
-        offset_line = template_lines[3]
-        xml = "\n".join(template_lines[4:])
-        _, __, id_ = id_line.partition(": ")
-        _, __, eid = eid_line.partition(": ")
-        _, __, offset = offset_line.partition(": ")
-        eid = int(eid)
-        offset = int(offset, 0x10)
-        return cls(eid, xml, offset)
+    def __exit__(self, type, value, traceback):
+        self._mmap.close()
+        self._f.close()
 
 
-class TemplateEIDConflictError(Exception):
-    def __init__(self, value):
-        super(TemplateEIDConflictError, self).__init__(value)
+def exists(fn, iterable):
+    """
+    Return True if one item in the sequence satisfies the function.
+    """
+    for i in iterable:
+        if fn(i):
+            return True
+    return False
 
 
-class TemplateNotFoundError(Exception):
-    def __init__(self, value):
-        super(TemplateNotFoundError, self).__init__(value)
+def do_common_argparse_config(description):
+    """
+    Return an object with at least the following fields:
+      verbose: boolean
+      vverbose: boolean
+      progress: boolean
+      image: str
+      project_name: str
+      template_db_name: str
+      progress_class: Progress class
+      project_json: str
+      templates_json: str
+    Also sets the logging config to the appropriate level given .verbose and .vverbose
+    """
+    import argparse
+    parser = argparse.ArgumentParser(
+        description=description)
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable debug logging.")
+    parser.add_argument("--vverbose", action="store_true",
+                        help="Enable verbose debug logging.")
+    parser.add_argument("--progress", action="store_true",
+                        help="Enable a progress bar (probably shouldn't be used with --verbose")
+    parser.add_argument("image", type=str,
+                        help="Path to the image file")
+    parser.add_argument("project_name", type=str, nargs="?", default="default")
+    parser.add_argument("template_db_name", type=str, nargs="?", default="default")
+    args = parser.parse_args()
 
+    has_some_logger_config = False
+    if args.verbose:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        has_some_logger_config = True
+    if args.vverbose:
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+        has_some_logger_config = True
+    if not has_some_logger_config:
+        logging.basicConfig(level=logging.WARN, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
-class TemplateDatabase(object):
-    def __init__(self):
-        # @type self._templates: {str: [Template]}
-        # ID --> list matching Templates with the ID
-        self._templates = {}
-        # @type self._eid_map: {int: [str]}
-        # EID --> list of ID
-        self._eid_map = {}
+    args.progress_class = NullProgress
+    if args.progress:
+        args.progress_class = ProgressBarProgress
 
-    def add_template(self, template):
-        """
-        Merge a new Template into the database.
+    args.project_json = args.project_name + ".json"
 
-        @type template: template
-        @rtype: None
-        """
-        id_ = template.get_id()
-        if id_ in self._templates:
-            found_existing = False
-            for other in self._templates[id_]:
-                if template.get_xml() == other.get_xml():
-                    found_existing = True
-                    break
-            if not found_existing:
-                self._templates[id_].append(template)
-        else:
-            self._templates[id_] = [template]
-            if template.get_eid() in self._eid_map:
-                self._eid_map[template.get_eid()].append(id_)
-            else:
-                self._eid_map[template.get_eid()] = [id_]
+    # if the user supplies an explicit project name, but no template db name, use the
+    #   project name as the basename for the template db
+    if args.project_name != "default" and args.template_db_name == "default":
+        args.template_db_name = args.project_name
 
-    def extend(self, other):
-        """
-        Merge another TemplateDatabase into this one.
+    if not args.template_db_name.endswith(".db"):
+        args.templates_json = args.template_db_name + ".db.json"
+    else:
+        args.templates_json = args.template_db_name + ".json"
 
-        @type other: TemplateDatabase
-        @rtype: None
-        """
-        for template_list in other._templates.values():
-            for template in template_list:
-                self.add_template(template)
+    return args
 
-    def get_template(self, eid, substitutions, exact_match=True):
-        """
-        Given an ID, attempt to pick the appropriate template.
-
-        `exact_match` should only be unset during testing.
-          Not for forensics.
-
-        @type eid: int
-        @type substitutions: list of (int, str)
-        @rtype: Template
-        @raises TemplateEIDConflictError
-        @raises TemplateNotFoundError
-        """
-        if eid not in self._eid_map:
-            raise TemplateNotFoundError(
-                "No loaded templates with EID: %s" % eid)
-
-        potential_templates = []
-        for id_ in self._eid_map[eid]:
-            potential_templates.extend(self._templates[id_])
-
-        matching_templates = []
-        for template in potential_templates:
-            if template.match_substitutions(substitutions):
-                matching_templates.append(template)
-
-        if exact_match and len(matching_templates) > 1:
-            matches = map(lambda t: t.get_id(), matching_templates)
-            raise TemplateEIDConflictError("%d templates matched query for "
-                                           "EID %d and substitutions: %s" %
-                                           (len(matching_templates), eid, matches))
-        if len(matching_templates) == 0:
-            sig = str(eid) + "-" + "-".join(["[%d|%d| ]" % (i, j) for i, j in \
-                                                 enumerate(map(lambda p: p[1], substitutions))])
-            raise TemplateNotFoundError(
-                "No loaded templates with given substitution signature: %s" %
-                sig)
-
-        return matching_templates[0]
-
-    def serialize(self):
-        """
-        Create a string representation of this database, suitable
-          for human review or deserialization.
-
-        @rtype: str
-        """
-        ret = []
-        for id_ in sorted(self._templates.keys()):
-            for template in self._templates[id_]:
-                ret.append(template.serialize())
-                ret.append("\n\n")
-        return "\n".join(ret)
-
-    def deserialize(self, txt, warn_on_conflict=True):
-        """
-        Load a serialized TemplateDatabase into this one.
-
-        Merges with whatever is currently in this database.
-
-        @type txt: str
-        @rtype: None
-        @raises: TemplateEIDConflictError
-        """
-        self._templates = {}
-        for template_txt in txt.split("TEMPLATE\n"):
-            template = Template.deserialize("TEMPLATE\n" + template_txt.rstrip("\n"))
-            if template is None:
-                continue
-            if template.get_id() in self._templates and warn_on_conflict:
-                raise TemplateEIDConflictError("More than one template with ID %s" %
-                                               template.get_id())
-            elif template.get_id() in self._templates and not warn_on_conflict:
-                self._templates[template.get_id()].append(template)
-            else:
-                self._templates[template.get_id()] = [template]
-                if template.get_eid() in self._eid_map:
-                    self._eid_map[template.get_eid()].append(template.get_id())
-                else:
-                    self._eid_map[template.get_eid()] = [template.get_id()]
