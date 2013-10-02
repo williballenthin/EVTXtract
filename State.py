@@ -23,6 +23,15 @@ class IncompatibleVersionException(Exception):
         return "IncompatibleVersionException(%s)" % self._msg
 
 
+class IncompatibleInputFileException(Exception):
+    def __init__(self, msg):
+        super(IncompatibleInputFileException, self).__init__()
+        self._msg = msg
+
+    def __str__(self):
+        return "IncompatibleInputFileException(%s)" % self._msg
+
+
 class State(object):
     """
     Class that loads and saves state to a persistent file.
@@ -44,6 +53,8 @@ class State(object):
         if self._get_version() != CURRENT_VERSION and self._get_version() != "":
             raise IncompatibleVersionException("Version %d expected, got %d" %
                                                (CURRENT_VERSION, self._get_version()))
+
+        self.test_input_file(self._filename)
 
         self._set_version(CURRENT_VERSION)
         if self._get_generator() == "":
@@ -72,10 +83,26 @@ class State(object):
         return self._state.get("generator", "")
 
     def _set_size(self, size):
-        self._state["size"] = size
+        meta = self._state.get("metadata", {})
+        meta["size"] = size
+        self._state["metadata"] = meta
+
+    def _get_size(self):
+        meta = self._state.get("metadata", None)
+        if meta is None:
+            return 0
+        return meta.get("size", 0)
 
     def _set_hash(self, hash_):
-        self._state["hash"] = hash_
+        meta = self._state.get("metadata", {})
+        meta["hash"] = hash_
+        self._state["metadata"] = meta
+
+    def _get_hash(self):
+        meta = self._state.get("metadata", None)
+        if meta is None:
+            return ""
+        return meta.get("hash", "")
 
     def set_input_file(self, input_path):
         self._set_size(os.stat(input_path).st_size)
@@ -83,6 +110,30 @@ class State(object):
         with open(input_path, "rb") as f:
             m.update(f.read(0x100000))
         self._set_hash(m.hexdigest())
+
+    def test_input_file(self, input_path):
+        """
+        Raises IncompatibleInputFileException if the file metadata for the input file
+          is not consistent with metadata stored from past runs in the state file.
+
+        @raises IncompatibleInputFileException
+        @type input_path: str
+        @param input_path: The path to the input file
+        @rtype: True
+        """
+        size = os.stat(input_path).st_size
+        m = hashlib.md5()
+        with open(input_path, "rb") as f:
+            m.update(f.read(0x100000))
+        hash_ = m.hexdigest()
+
+        if self._get_size() != 0 and self._get_size != size:
+            raise IncompatibleInputFileException("File size: %d, expected %d" % (size, self._get_size()))
+
+        if self._get_hash() != "" and self._get_hash() != hash_:
+            raise IncompatibleInputFileException("File hash: %s, expected %s" % (hash_, self._get_hash()))
+
+        return True
 
     def _add_list_entry(self, list_name, value):
         """

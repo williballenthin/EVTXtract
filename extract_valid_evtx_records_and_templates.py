@@ -19,12 +19,11 @@
 #   Version v0.1
 import re
 import logging
-from Evtx.BinaryParser import hex_dump
 
 from Evtx.Evtx import ChunkHeader
-from Evtx.Nodes import BXmlTypeNode, EndOfStreamNode, OpenStartElementNode, AttributeNode, CloseStartElementNode, CloseEmptyElementNode, CloseElementNode, ValueNode, CDataSectionNode, EntityReferenceNode, ProcessingInstructionTargetNode, ProcessingInstructionDataNode, TemplateInstanceNode, NormalSubstitutionNode, ConditionalSubstitutionNode, StreamStartNode, TemplateNode
+from Evtx.Nodes import BXmlTypeNode
 from Evtx.Evtx import InvalidRecordException
-from Evtx.Views import evtx_record_xml_view, UnexpectedElementException
+from Evtx.Views import evtx_record_xml_view, evtx_template_readable_view
 from Progress import NullProgress
 from State import State
 from TemplateDatabase import TemplateDatabase
@@ -52,70 +51,6 @@ def _make_replacement(template, index, substitution):
         from_pattern = re.compile("\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index)
         _replacement_patterns[index] = from_pattern
     return _replacement_patterns[index].sub(substitution, template)
-
-
-def evtx_template_readable_view(root_node, cache=0):
-    def rec(node, acc):
-        if isinstance(node, EndOfStreamNode):
-            pass  # intended
-        elif isinstance(node, OpenStartElementNode):
-            acc.append("<")
-            acc.append(node.tag_name())
-            for child in node.children():
-                if isinstance(child, AttributeNode):
-                    acc.append(" ")
-                    acc.append(child.attribute_name().string())
-                    acc.append("=\"")
-                    rec(child.attribute_value(), acc)
-                    acc.append("\"")
-            acc.append(">")
-            for child in node.children():
-                rec(child, acc)
-            acc.append("</")
-            acc.append(node.tag_name())
-            acc.append(">\n")
-        elif isinstance(node, CloseStartElementNode):
-            pass  # intended
-        elif isinstance(node, CloseEmptyElementNode):
-            pass  # intended
-        elif isinstance(node, CloseElementNode):
-            pass  # intended
-        elif isinstance(node, ValueNode):
-            acc.append(node.children()[0].string())
-        elif isinstance(node, AttributeNode):
-            pass  # intended
-        elif isinstance(node, CDataSectionNode):
-            acc.append("<![CDATA[")
-            acc.append(node.cdata())
-            acc.append("]]>")
-        elif isinstance(node, EntityReferenceNode):
-            acc.append(node.entity_reference())
-        elif isinstance(node, ProcessingInstructionTargetNode):
-            acc.append(node.processing_instruction_target())
-        elif isinstance(node, ProcessingInstructionDataNode):
-            acc.append(node.string())
-        elif isinstance(node, TemplateInstanceNode):
-            raise UnexpectedElementException("TemplateInstanceNode")
-        elif isinstance(node, NormalSubstitutionNode):
-            acc.append("[Normal Substitution(index=%d, type=%d)]" % \
-                           (node.index(), node.type()))
-        elif isinstance(node, ConditionalSubstitutionNode):
-            acc.append("[Conditional Substitution(index=%d, type=%d)]" % \
-                           (node.index(), node.type()))
-        elif isinstance(node, StreamStartNode):
-            pass  # intended
-
-    # TODO(wb): reeval this
-    acc = []
-    template_instance = root_node.fast_template_instance()
-    templ_off = template_instance.template_offset() + template_instance._chunk.offset()
-    node = TemplateNode(template_instance._buf, templ_off, template_instance._chunk, template_instance)
-    sub_acc = []
-    for c in node.children():
-        rec(c, sub_acc)
-    sub_templ = "".join(sub_acc)
-    acc.append(sub_templ)
-    return "".join(acc)
 
 def _get_complete_template(root, current_index=0):
     """

@@ -101,8 +101,8 @@ class Template(object):
         """
         logger = logging.getLogger("match_substitutions")
         placeholders = self._get_placeholders()
-        print substitutions
-        print placeholders
+        logger.debug("Substitutions: %s", str(substitutions))
+        logger.debug("Constraints: %s", str(placeholders))
         if len(placeholders) > len(substitutions):
             logger.debug("Failing on lens: %d vs %d",
                          len(placeholders), len(substitutions))

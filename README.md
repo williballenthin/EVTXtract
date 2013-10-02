@@ -37,7 +37,7 @@ TODO
 1. DONE fix valid_record xml
 2. DONE fix bug parsing chunks and records for valid records/templates
 3. DONE ensure templates are not duplicated in the database
-4. Figure out what happens with multiple runs on different files
+4. DONE Figure out what happens with multiple runs on different files
      --> they must match, or the offsets will get screwed up
      --> therefore, the bug is to warn if the files differ, or if data already exists
 5. DONE Logging issue
@@ -45,13 +45,15 @@ TODO
       No handlers could be found for logger "extract_records"
 6. DONE Move argparser config to common area
 7. figure out idempotency for state, related: #4
+     --> this should probably be up to the user, or it gets very confusing.
+     --> could perhaps add flags to the state file describing what tools have been run
 8. consider GZIPing the state and database files
 9. write dumping scripts
 10. DONE implement .get_template
 11. DONE figure out where IDs should be used --> nowhere
 12. DONE move things out of main
 13. consider writing a Q&A/wizard style interface
-14. develop flowchart describing usage
+14. DONE develop flowchart describing usage
 15. DONE for state/db file, on error, should the existing state be written out best-effort?
 16. DONE Template.get_id is broken, only returns EID
 17. DONE if project name specified, update the templatedb default
@@ -60,6 +62,9 @@ TODO
 20. add status output so the user knows that something happened. Use print() for this, not logging
 21. DONE make substitution object/list things consistent. 2- or 3-tuples?
 22. DONE nested template indices are incorrect. seems to be a string concat somewhere
+23. rewrite tests
+
+Blockers: 23, 20, 9
 
 
 JSON format
@@ -126,3 +131,42 @@ JSON format
     ]
   }
 }
+
+
+
+## Wizard
+
+0. Call the project $project, evidence $evidence, identifier() takes a filename and gives a nice readable name (perhaps, `basename` with whitespace stripped out)
+1. Can you get any EVTX files related to the evidence? call these $real_evtxs
+2. Is the evidence an image, and can you and/or do you want to process just unallocated space? call this $unalloc
+
+If 1 & 2 are true, then we can extract the legitimate templates from the existing EVTX files, and focus our recovery on the unallocated space. This is the best case.
+  for each $real_evtx in $real_evtxs:
+    python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
+    python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
+  python find_evtx_chunks.py $evidence $project $project
+  python extract_valid_evtx_records_and_templates.py $unalloc $project
+  python find_evtx_records.py $unalloc $project $project
+  python extract_lost_evtx_records.py $unalloc $project $project
+  python reconstruct_lost_records.py $unalloc $project $project
+
+If 1 is true, 2 is false, then we can extract the legitimate templates from the existing EVTX files, but we might double-process entries (which is fine, but takes longer).
+  for each $real_evtx in $real_evtxs:
+    python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
+    python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
+  python find_evtx_chunks.py $evidence $project $project
+  python extract_valid_evtx_records_and_templates.py $evidence $project $project
+  python find_evtx_records.py $evidence $project $project
+  python extract_lost_evtx_records.py $evidence $project $project
+  python reconstruct_lost_records.py $evidence $project $project
+
+Otherwise, we can discover everything we can using no a priori knowledge of the evidence.
+  python find_evtx_chunks.py $evidence $project $project
+  python extract_valid_evtx_records_and_templates.py $evidence $project $project
+  python find_evtx_records.py $evidence $project $project
+  python extract_lost_evtx_records.py $evidence $project $project
+  python reconstruct_lost_records.py $evidence $project $project
+
+
+
+
