@@ -66,7 +66,7 @@ TODO
 24. need a means to identify template conflicts and resolve them
 25. remove old scripts (merge template files, validate)
 
-Blockers: 23, 20, 9
+Blockers: 23, 20
 
 
 JSON format
