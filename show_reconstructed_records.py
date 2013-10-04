@@ -20,12 +20,11 @@ from recovery_utils import do_common_argparse_config
 
 
 def main():
-    args = do_common_argparse_config("Show valid EVTX records.")
+    args = do_common_argparse_config("Show reconstructed EVTX records.")
     with State(args.project_json) as state:
-        if len(state.get_valid_records()) == 0:
-            print ("# No valid records found.")
-
-        for event in state.get_valid_records():
+        if len(state.get_reconstructed_records()) == 0:
+            print ("# No reconstructed records found.")
+        for event in state.get_reconstructed_records():
             print(event["xml"])
 
 if __name__ == "__main__":

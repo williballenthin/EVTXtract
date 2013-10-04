@@ -262,6 +262,9 @@ class State(object):
         })
 
     def get_reconstructed_records(self):
+        """
+        Do not modify the returned list.
+        """
         return self._state.get("reconstructed_records", [])
 
     def add_unreconstructed_record(self, offset, substitutions, reason):
@@ -272,4 +275,7 @@ class State(object):
         })
 
     def get_unreconstructed_records(self):
+        """
+        Do not modify the returned list.
+        """
         return self._state.get("unreconstructed_records", [])

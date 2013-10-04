@@ -48,7 +48,7 @@ TODO
      --> this should probably be up to the user, or it gets very confusing.
      --> could perhaps add flags to the state file describing what tools have been run
 8. consider GZIPing the state and database files
-9. write dumping scripts
+9. DONE write dumping scripts
 10. DONE implement .get_template
 11. DONE figure out where IDs should be used --> nowhere
 12. DONE move things out of main
