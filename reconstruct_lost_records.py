@@ -67,8 +67,8 @@ def main():
     with State(args.project_json) as state:
         with TemplateDatabase(args.templates_json) as templates:
             num_reconstructed, num_unreconstructed = reconstruct_lost_records(state, templates, progress_class=args.progress_class)
-    print("# Number of reconstructed records: %d" % num_reconstructed)
-    print("# Number of records unable to reconstruct: %d" % num_unreconstructed)
+    print("# Reconstructed %d records." % num_reconstructed)
+    print("# Failed to reconstruct %d records." % num_unreconstructed)
 
 
 if __name__ == "__main__":

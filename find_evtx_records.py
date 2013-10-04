@@ -98,10 +98,11 @@ def main():
         ranges.append((range_start, os.stat(args.image).st_size))  # from here to end of file
 
         with Mmap(args.image) as buf:
+            num_potential_records_before = len(state.get_potential_record_offsets())
             for offset in find_lost_evtx_records(buf, ranges, progress_class=args.progress_class):
                 state.add_potential_record_offset(offset)
-
-
+            num_potential_records_after = len(state.get_potential_record_offsets())
+            print("# Found %d potential EVTX records." % num_potential_records_after - num_potential_records_before)
 
 
 if __name__ == "__main__":

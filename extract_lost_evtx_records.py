@@ -374,8 +374,8 @@ def main():
         with Mmap(args.image) as buf:
             num_extracted, num_failures = extract_lost_evtx_records(state, buf, args.progress_class)
 
-    logger.info("Number of extracted records: %d",  num_extracted)
-    logger.info("Number of failed record extractions: %d", num_failures)
+    print("# Extracted %d records." %  num_extracted)
+    print("# Failed to extract %d potential records." % num_failures)
 
 
 if __name__ == "__main__":

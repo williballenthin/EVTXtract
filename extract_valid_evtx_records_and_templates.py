@@ -52,6 +52,7 @@ def _make_replacement(template, index, substitution):
         _replacement_patterns[index] = from_pattern
     return _replacement_patterns[index].sub(substitution, template)
 
+
 def _get_complete_template(root, current_index=0):
     """
     Gets the template from a RootNode while resolving any
@@ -178,8 +179,13 @@ def main():
             return
         with TemplateDatabase(args.templates_json) as templates:
             with Mmap(args.image) as buf:
+                num_templates_before = templates.get_number_of_templates()
+                num_valid_records_before = len(state.get_valid_records())
                 extract_valid_evtx_records_and_templates(state, templates, buf, progress_class=args.progress_class)
-
+                num_templates_after = templates.get_number_of_templates()
+                num_valid_records_after = len(state.get_valid_records())
+                print("# Found %d new templates." % num_templates_after - num_templates_before)
+                print("# Found %d new valid records." % num_valid_records_after - num_valid_records_before)
 
 if __name__ == "__main__":
     main()

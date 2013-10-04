@@ -61,9 +61,11 @@ def find_evtx_chunks(state, buf, progress_class=NullProgress):
 
     @type state: State
     @type buf: bytestring
-    @rtype: generator of (int, int)
+    @rtype: int
+    @return: The number of chunks found and added to the State database.
     """
     progress = progress_class(len(buf))
+    num_chunks_found = 0
     index = buf.find(EVTX_HEADER_MAGIC)
     while index != -1:
         progress.set_current(index)
@@ -77,8 +79,10 @@ def find_evtx_chunks(state, buf, progress_class=NullProgress):
                 logger.debug("%s\t%s" % ("CHUNK_BAD_DATA", hex(index)))
             else:
                 state.add_valid_chunk_offset(index)
+                num_chunks_found += 1
         index = buf.find(EVTX_HEADER_MAGIC, index + 1)
     progress.set_complete()
+    return num_chunks_found
 
 
 def main():
@@ -86,7 +90,9 @@ def main():
 
     with State(args.project_json) as state:
         with Mmap(args.image) as buf:
-            find_evtx_chunks(state, buf, progress_class=args.progress_class)
+            num_chunks_found = find_evtx_chunks(state, buf, progress_class=args.progress_class)
+    print("# Found %d valid chunks." % num_chunks_found)
+
 
 if __name__ == "__main__":
     main()

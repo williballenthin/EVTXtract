@@ -303,3 +303,12 @@ class TemplateDatabase(object):
                                         "substitution signature: %s" % sig)
 
         return matching_templates[0]
+
+    def get_number_of_templates(self):
+        """
+        Get the number of templates tracked in this database.
+
+        @rtype: int
+        @return: The number of templates tracked in this database.
+        """
+        return sum(map(len, self._state.get("templates", {}))
