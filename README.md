@@ -133,36 +133,39 @@ This script does not modify the project or template database files.
 
 ## Wizard
 
-0. Call the project $project, evidence $evidence, identifier() takes a filename and gives a nice readable name (perhaps, `basename` with whitespace stripped out)
+0. Call the project `$project`, evidence `$evidence`, `identifier()` takes a filename and gives a nice readable name (perhaps, `basename` with whitespace stripped out)
 1. Can you get any EVTX files related to the evidence? call these $real_evtxs
 2. Is the evidence an image, and can you and/or do you want to process just unallocated space? call this $unalloc
 
 If 1 & 2 are true, then we can extract the legitimate templates from the existing EVTX files, and focus our recovery on the unallocated space. This is the best case.
-      for each $real_evtx in $real_evtxs:
-        python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
-        python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
-      python find_evtx_chunks.py $evidence $project $project
-      python extract_valid_evtx_records_and_templates.py $unalloc $project
-      python find_evtx_records.py $unalloc $project $project
-      python extract_lost_evtx_records.py $unalloc $project $project
-      python reconstruct_lost_records.py $unalloc $project $project
+
+    for each $real_evtx in $real_evtxs:
+      python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
+      python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
+    python find_evtx_chunks.py $evidence $project $project
+    python extract_valid_evtx_records_and_templates.py $unalloc $project
+    python find_evtx_records.py $unalloc $project $project
+    python extract_lost_evtx_records.py $unalloc $project $project
+    python reconstruct_lost_records.py $unalloc $project $project
 
 If 1 is true, 2 is false, then we can extract the legitimate templates from the existing EVTX files, but we might double-process entries (which is fine, but takes longer).
-      for each $real_evtx in $real_evtxs:
-        python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
-        python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
-      python find_evtx_chunks.py $evidence $project $project
-      python extract_valid_evtx_records_and_templates.py $evidence $project $project
-      python find_evtx_records.py $evidence $project $project
-      python extract_lost_evtx_records.py $evidence $project $project
-      python reconstruct_lost_records.py $evidence $project $project
+
+    for each $real_evtx in $real_evtxs:
+      python find_evtx_chunks.py $real_evtx identifier($real_evtx) $project
+      python extract_valid_evtx_records_and_templates.py $real_evtx identifier($real_evtx) $project
+    python find_evtx_chunks.py $evidence $project $project
+    python extract_valid_evtx_records_and_templates.py $evidence $project $project
+    python find_evtx_records.py $evidence $project $project
+    python extract_lost_evtx_records.py $evidence $project $project
+    python reconstruct_lost_records.py $evidence $project $project
 
 Otherwise, we can discover everything we can using no a priori knowledge of the evidence.
-      python find_evtx_chunks.py $evidence $project $project
-      python extract_valid_evtx_records_and_templates.py $evidence $project $project
-      python find_evtx_records.py $evidence $project $project
-      python extract_lost_evtx_records.py $evidence $project $project
-      python reconstruct_lost_records.py $evidence $project $project
+
+    python find_evtx_chunks.py $evidence $project $project
+    python extract_valid_evtx_records_and_templates.py $evidence $project $project
+    python find_evtx_records.py $evidence $project $project
+    python extract_lost_evtx_records.py $evidence $project $project
+    python reconstruct_lost_records.py $evidence $project $project
 
 
 JSON format
