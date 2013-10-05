@@ -183,8 +183,8 @@ def main():
                 extract_valid_evtx_records_and_templates(state, templates, buf, progress_class=args.progress_class)
                 num_templates_after = templates.get_number_of_templates()
                 num_valid_records_after = len(state.get_valid_records())
-                print("# Found %d new templates." % num_templates_after - num_templates_before)
-                print("# Found %d new valid records." % num_valid_records_after - num_valid_records_before)
+                print("# Found %d new templates." % (num_templates_after - num_templates_before))
+                print("# Found %d new valid records." % (num_valid_records_after - num_valid_records_before))
 
 if __name__ == "__main__":
     main()

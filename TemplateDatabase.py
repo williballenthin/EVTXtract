@@ -322,4 +322,4 @@ class TemplateDatabase(object):
         @rtype: int
         @return: The number of templates tracked in this database.
         """
-        return sum(map(len, self._state.get("templates", {}))
+        return sum(map(len, self._state.get("templates", {}).values()))

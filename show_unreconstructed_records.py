@@ -56,13 +56,13 @@ def format_unreconstructed_record(record, line_prefix=""):
       "reason": str
     """
     ret = ["%sUNRECONSTRUCTED RECORD" % line_prefix,
-           "%Offset: %d" % (line_prefix, record["offset"]),
-           "%Reason: %s" % (line_prefix, record["reason"]),
-           "%sSubstitutions:"]
+           "%sOffset: %d" % (line_prefix, record["offset"]),
+           "%sReason: %s" % (line_prefix, record["reason"]),
+           "%sSubstitutions:" % (line_prefix)]
     for sub_type, sub_value in record["substitutions"]:
         out_type, out_value = _sub_types.get(sub_type, "UnknownType"), str(sub_value)
         ret.append("%s  Substitution: %s  %s" % (line_prefix, out_type, out_value))
-    return ret.join("\n")
+    return "\n".join(ret)
 
 
 def main():
