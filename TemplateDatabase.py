@@ -294,17 +294,11 @@ class TemplateDatabase(object):
             # already in cache
             potential_templates = self._cached_templates[str(eid)]
 
-        #
-        # this is the interesting part  ###########
-        #
         matching_templates = []
         logger.debug("considering %d possible templates based on EID", len(potential_templates))
         for template in potential_templates:
             if template.match_substitutions(substitutions):
                 matching_templates.append(template)
-        #
-        ############################################
-        #
 
         if len(matching_templates) > 1:
             matches = map(lambda t: t.get_id(), matching_templates)
