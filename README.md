@@ -228,12 +228,14 @@ Otherwise, we can discover everything we can using no a priori knowledge of the 
     python show_reconstructed_records.py $evidence $project $project
 
 
-JSON format
------------
+Developer Stuff
+---------------
+
+### JSON format
 EVTXtract stores the current state of each project in a pair of JSON encoded files.
 The following sections describe the schema for the JSON objects.
 
-## State file
+#### State file
     {
       version: int
       generator: str
@@ -279,7 +281,7 @@ The following sections describe the schema for the JSON objects.
       ]
     }
 
-## Template File
+#### Template File
     {
       version: int
       generator: str
@@ -297,8 +299,7 @@ The following sections describe the schema for the JSON objects.
     }
 
 
-TODO
-----
+### TODO
 1. DONE fix valid_record xml
 2. DONE fix bug parsing chunks and records for valid records/templates
 3. DONE ensure templates are not duplicated in the database
