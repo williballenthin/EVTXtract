@@ -61,7 +61,9 @@ Because of the checksum, subsequent scripts can assume the valid chunks are comp
 This script saves the valid chunk locations in the project file.
 
 #### Example
-
+    Git/recover-evtx - [master\u25cf] \u00bb python find_evtx_chunks.py unallocated.bin ACME_system1 ACME_system1 --progress
+    Progress: 1118208 of 1118208 100% [============================================================================================] Time: 0:00:00
+    # Found 9 valid chunks.
 
 
 ### `extract_valid_evtx_records_and_templates.py`
@@ -77,65 +79,120 @@ Users can run this script against complete EVTX files to extract known templates
 By reusing the same template database file, and varying the input file, users can collect templates from many sources.
 
 #### Example
+    Git/recover-evtx - [master\u25cf] \u00bb python extract_valid_evtx_records_and_templates.py unallocated.bin ACME_system1 ACME_system1 --progress
+    Progress: 8 of 8 100% [========================================================================================================] Time: 0:00:05
+    # Found 29 new templates.
+    # Found 847 new valid records.
 
 
 ### `find_evtx_records.py`
 #### Summary
 `find_evtx_records.py` scans the input file and identifies potential EVTX records.
 These records will be "lost" records, that is, records that do not fall within a verified EVTX chunk.
-The script uses a heuristic to identify structures that appear to be EVTX records; however, it may be fooled in unusual, and uncommon circumstances.
+The script uses a heuristic to identify structures that appear to be EVTX records; however, it may be fooled in unusual, and uncommon, circumstances.
 This script saves the potential record locations in the project file.
 Subsequent scripts extract these fragments and attempt to reconstruct them using known templates.
 
 #### Example
-
+    Git/recover-evtx - [master\u25cf] \u00bb python find_evtx_records.py unallocated.bin ACME_system1 ACME_system1 --progress
+    Progress: 46144 of 46144 100% [================================================================================================] Time: 0:00:00
+    # Found 65 potential EVTX records.
 
 ### `extract_lost_evtx_records.py`
 #### Summary
-`extract_lost_evtx_records.py`
+`extract_lost_evtx_records.py` uses the locations of "lost" records from the state file to extract these record's substitution data.
+It parses out record header data, such as record number, as well as the substitution array.
 This script saves the extracted record data in the project file.
+Subsequent scripts will combine the substitution data extracted from "lost" records with the template database to reconstruct complete entries.
 
 #### Example
+    Git/recover-evtx - [master\u25cf] \u00bb python extract_lost_evtx_records.py unallocated.bin ACME_system1 ACME_system1 --progress
+    Progress: 129 of 129 100% [====================================================================================================] Time: 0:00:00
+    # Extracted 130 records.
+    # Failed to extract 0 potential records.
 
 
 ### `reconstruct_lost_evtx_records.py`
 #### Summary
-`reconstruct_lost_evtx_records.py`
+`reconstruct_lost_evtx_records.py` takes the data from "lost" records saved in the state file and tries to reconstruct the original entries using the template database.
+It uses the signature of the subtitution array and EID to make a best guess as to which template to apply to a subsitution array.
+A record can be successfully reconstructed if the signature of its substitutions exactly match a template's signature, and there is no ambiguity (more than one template has the same signature, a "template conflict").
+This script is unable to reconstruct records whose substitution array have a previously unencountered signature, or match more than one potential template.
 This script saves the reconstructed and unreconstructed records in the project file.
+The reconstructed record will contain the XML of a complete entry, while an unreconstructed record will retain the raw substitution array and an the error.
 
 #### Example
-
+    Git/recover-evtx - [master\u25cf] \u00bb python reconstruct_lost_records.py unallocated.bin ACME_system1 ACME_system1 --progress
+    Progress: 130 of 130 100% [====================================================================================================] Time: 0:00:00
+    # Reconstructed 130 records.
+    # Failed to reconstruct 0 records.
 
 ### `show_valid_records.py`
 #### Summary
-`show_valid_records.py`
+`show_valid_records.py` prints to standard output the XML entries for the valid and verified records recovered by `extract_valid_evtx_records_and_templates.py`.
 This script does not modify the project or template database files.
 
-
 #### Example
-
+    Git/recover-evtx - [master\u25cf] \u00bb python show_valid_records.py unallocated.bin ACME_system1 ACME_system1 | head
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing" Guid="54849625-5478-4994-a5ba-3e3b0328c30d"></Provider>
+    <EventID Qualifiers="">4608</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>12288</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2012-08-30 05:50:37.361267"></TimeCreated>
+    <EventRecordID>1</EventRecordID>
+    <Correlation ActivityID="" RelatedActivityID=""></Correlation>
+    ...
 
 ### `show_reconstructed_records.py`
 #### Summary
-`show_reconstructed_records.py`
+`show_reconstructed_records.py` prints to standard output the XML entries reconstructed by `reconstruct_lost_evtx_records.py`.
 This script does not modify the project or template database files.
 
 #### Example
+    Git/recover-evtx - [master\u25cf] \u00bb python show_reconstructed_records.py unallocated.bin ACME_system1 ACME_system1 | head
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft\-Windows\-Security\-Auditing" Guid="0001010f\-010c\-ca6d\-72c7\-260200000000"></Provider>
+    <EventID Qualifiers="None">4608</EventID>
+    <Version>0</Version>
+    <Level>0</Level>
+    <Task>12288</Task>
+    <Opcode>0</Opcode>
+    <Keywords>0x8020000000000000</Keywords>
+    <TimeCreated SystemTime="2012\-08\-30T05\:50\:37\.361267Z"></TimeCreated>
+    <EventRecordID>1</EventRecordID>
+    <Correlation ActivityID="None" RelatedActivityID="None"></Correlation>
+    ...
 
 
 ### `show_unreconstructed_records.py`
 #### Summary
-`show_unreconstructed_records.py`
+`show_unreconstructed_records.py` prints to standard output the metadata and subsitution array for records that were not able to be reconstructed by `reconstruct_lost_evtx_records.py`.
 This script does not modify the project or template database files.
 
 #### Example
+    Git/recover-evtx - [master\u25cf] \u00bb python show_unreconstructed_records.py unallocated.bin ACME_system1 ACME_system1 | head
+    UNRECONSTRUCTED RECORD
+    Offset: 512
+    Reason: No loaded templates with EID: 4608
+    Substitutions:
+      Substitution: UnsignedByte  0
+      Substitution: UnsignedByte  0
+      Substitution: UnsignedWord  12288
+      Substitution: UnsignedWord  4608
+      Substitution: Null  None
+      Substitution: Hex64  0x8020000000000000
 
 
 ## Wizard
+EVTXtract is provided as a set of lower level scripts so they can be recombined in different ways depending on the situation.
+For example, you may be able to process and extract files from a disk image (which will help EVTXtract do its magic), but not be able to do much relevant extra processing on a memory image.
+The following describes a few common cases to help you get familiar with the EVTXtract workflow.
 
-0. Call the project `$project`, evidence `$evidence`, `identifier()` takes a filename and gives a nice readable name (perhaps, `basename` with whitespace stripped out)
-1. Can you get any EVTX files related to the evidence? call these $real_evtxs
-2. Is the evidence an image, and can you and/or do you want to process just unallocated space? call this $unalloc
+0. Call the project: `$project`, vinary evidence file: `$evidence`, and have `identifier()` be some function (can even take place in your brain!) that takes a filename and gives a nice readable name (perhaps, `basename` with whitespace stripped out).
+1. Can you get any EVTX files related to the evidence? call these `$real_evtxs`.
+2. Is the evidence an image, and can you and/or do you want to process just unallocated space? call this `$unalloc`.
 
 If 1 & 2 are true, then we can extract the legitimate templates from the existing EVTX files, and focus our recovery on the unallocated space. This is the best case.
 
@@ -147,6 +204,7 @@ If 1 & 2 are true, then we can extract the legitimate templates from the existin
     python find_evtx_records.py $unalloc $project $project
     python extract_lost_evtx_records.py $unalloc $project $project
     python reconstruct_lost_records.py $unalloc $project $project
+    python show_reconstructed_records.py $unalloc $project $project
 
 If 1 is true, 2 is false, then we can extract the legitimate templates from the existing EVTX files, but we might double-process entries (which is fine, but takes longer).
 
@@ -158,6 +216,7 @@ If 1 is true, 2 is false, then we can extract the legitimate templates from the 
     python find_evtx_records.py $evidence $project $project
     python extract_lost_evtx_records.py $evidence $project $project
     python reconstruct_lost_records.py $evidence $project $project
+    python show_reconstructed_records.py $unalloc $project $project
 
 Otherwise, we can discover everything we can using no a priori knowledge of the evidence.
 
@@ -166,6 +225,7 @@ Otherwise, we can discover everything we can using no a priori knowledge of the 
     python find_evtx_records.py $evidence $project $project
     python extract_lost_evtx_records.py $evidence $project $project
     python reconstruct_lost_records.py $evidence $project $project
+    python show_reconstructed_records.py $evidence $project $project
 
 
 JSON format
