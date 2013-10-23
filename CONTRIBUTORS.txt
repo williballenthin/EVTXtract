@@ -1,0 +1,5 @@
+The following contributors made EVTXtract a better tool through bug reports, feature requests, and testing:
+  - Sarah Edwards, for testing
+  - Jamie Levy, for testing
+  - John McCash, for testing
+  - Eugene Carpenter, for help documenting in the README

@@ -44,6 +44,11 @@ The EVTXtract tools are a set of pure Python scripts.
 To extract and recover records, users must call a sequence of the scripts.
 One can easily build a more intuitive user interface on top of these lower level scripts; however, this UI will not be as simple and flexibile.
 
+## Dependencies:
+EVTXtract depends on the following pure Python modules that are easily installable using `pip` or `easy_install`:
+
+  - [python-evtx](http://www.williballenthin.com/evtx/)
+  - [progressbar](http://code.google.com/p/python-progressbar/)
 
 ## Scripts
 Each of the following scripts accepts the same positional arguments:
@@ -331,5 +336,7 @@ The following sections describe the schema for the JSON objects.
 23. rewrite tests
 24. need a means to identify template conflicts and resolve them
 25. remove old scripts (merge template files, validate)
+26. check the checksumming
+27. handle arbitrary binary data
 
 Blockers: 23
