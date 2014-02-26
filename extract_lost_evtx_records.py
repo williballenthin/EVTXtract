@@ -17,7 +17,9 @@
 #   limitations under the License.
 import struct
 import logging
+import json
 from datetime import datetime
+
 from Progress import NullProgress
 from State import State
 from recovery_utils import Mmap, do_common_argparse_config
@@ -355,10 +357,15 @@ def extract_lost_evtx_records(state, buf, progress_class=NullProgress):
     for i, record_offset in enumerate(state.get_potential_record_offsets()):
         try:
             record = extract_lost_record(buf, record_offset)
-            state.add_lost_record(record_offset, record["timestamp"], record["record_num"], record["substitutions"])
-            num_extracted += 1
+            try:
+                json.dumps(record["substitutions"])
+            except:
+                num_failures += 1
+            else:
+                state.add_lost_record(record_offset, record["timestamp"], record["record_num"], record["substitutions"])
+                num_extracted += 1
         except Exception:
-            logging.warning("Exception encountered processing lost record at %s", hex(record_offset), exc_info=True)
+            logging.debug("Exception encountered processing lost record at %s", hex(record_offset), exc_info=True)
             num_failures += 1
         progress.set_current(i)
     progress.set_complete()
