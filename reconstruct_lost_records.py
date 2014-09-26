@@ -34,6 +34,8 @@ def reconstruct_lost_records(state, templates, progress_class=NullProgress):
     """
     num_reconstructed = 0
     num_unreconstructed = 0
+    if len(state.get_lost_records()) == 0:
+        return num_reconstructed, num_unreconstructed
     progress = progress_class(len(state.get_lost_records()))
     for i, lost_record in enumerate(state.get_lost_records()):
         progress.set_current(i)
