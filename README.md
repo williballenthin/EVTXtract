@@ -117,9 +117,9 @@ Subsequent scripts will combine the substitution data extracted from "lost" reco
     # Failed to extract 0 potential records.
 
 
-### reconstruct_lost_evtx_records.py
+### reconstruct_lost_records.py
 #### Summary
-`reconstruct_lost_evtx_records.py` takes the data from "lost" records saved in the state file and tries to reconstruct the original entries using the template database.
+`reconstruct_lost_records.py` takes the data from "lost" records saved in the state file and tries to reconstruct the original entries using the template database.
 It uses the signature of the subtitution array and EID to make a best guess as to which template to apply to a subsitution array.
 A record can be successfully reconstructed if the signature of its substitutions exactly match a template's signature, and there is no ambiguity (more than one template has the same signature, a "template conflict").
 This script is unable to reconstruct records whose substitution array have a previously unencountered signature, or match more than one potential template.
@@ -153,7 +153,7 @@ This script does not modify the project or template database files.
 
 ### show_reconstructed_records.py
 #### Summary
-`show_reconstructed_records.py` prints to standard output the XML entries reconstructed by `reconstruct_lost_evtx_records.py`.
+`show_reconstructed_records.py` prints to standard output the XML entries reconstructed by `reconstruct_lost_records.py`.
 This script does not modify the project or template database files.
 
 #### Example
@@ -173,7 +173,7 @@ This script does not modify the project or template database files.
 
 ### show_unreconstructed_records.py
 #### Summary
-`show_unreconstructed_records.py` prints to standard output the metadata and subsitution array for records that were not able to be reconstructed by `reconstruct_lost_evtx_records.py`.
+`show_unreconstructed_records.py` prints to standard output the metadata and subsitution array for records that were not able to be reconstructed by `reconstruct_lost_records.py`.
 This script does not modify the project or template database files.
 
 #### Example
