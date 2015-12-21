@@ -39,11 +39,15 @@ def reconstruct_lost_records(state, templates, progress_class=NullProgress):
     progress = progress_class(len(state.get_lost_records()))
     for i, lost_record in enumerate(state.get_lost_records()):
         progress.set_current(i)
-        eid = lost_record["substitutions"][3][1]
+        raw_subs = lost_record.get("substitutions", [])
+        if len(subs) < 4:
+            logger.debug("Substitution array to small (%d), skipping: record %d", len(raw_subs), lost_record["record_num"])
+            continue
+        eid = raw_subs[3][1]
         try:
             logger.debug("Fetching template for record %d with EID: %d num_subs: %d" %
-                         (lost_record["record_num"], eid, len(lost_record["substitutions"])))
-            template = templates.get_template(eid, lost_record["substitutions"])
+                         (lost_record["record_num"], eid, len(raw_subs)))
+            template = templates.get_template(eid, raw_subs)
         except TemplateEIDConflictError as e:
             state.add_unreconstructed_record(lost_record["offset"], lost_record["substitutions"], str(e))
             num_unreconstructed += 1
@@ -54,6 +58,7 @@ def reconstruct_lost_records(state, templates, progress_class=NullProgress):
             num_unreconstructed += 1
             logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
             continue
+        
         subs = map(lambda s: (s[0], str(s[1])), lost_record["substitutions"])
         state.add_reconstructed_record(lost_record["offset"], eid, template.insert_substitutions(subs))
         num_reconstructed += 1
