@@ -40,7 +40,7 @@ def reconstruct_lost_records(state, templates, progress_class=NullProgress):
     for i, lost_record in enumerate(state.get_lost_records()):
         progress.set_current(i)
         raw_subs = lost_record.get("substitutions", [])
-        if len(subs) < 4:
+        if len(raw_subs) < 4:
             logger.debug("Substitution array to small (%d), skipping: record %d", len(raw_subs), lost_record["record_num"])
             continue
         eid = raw_subs[3][1]
