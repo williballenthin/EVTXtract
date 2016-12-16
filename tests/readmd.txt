@@ -1,0 +1,5 @@
+the default test file is `WinXP.dd` from Lance Mueller's
+[Forensic Practical #2](http://www.forensickb.com/2008/01/forensic-practical-2.html)
+
+download the encase image [here](http://www.lancemueller.com/blog/evidence/WinXP.E01)
+and convert it into a raw image.
