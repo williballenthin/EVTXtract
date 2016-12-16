@@ -1,5 +1,0 @@
-This is from John McCash <john.mccash@motorolasolutions.com>.
-
-Willi,
-                Here’s my first bug report. It’s probably a pretty minor issue, but the evtx files in the attached archive don’t seem to be parsed properly by the extract_valid_evtx_records_and_templates.py script (meaning the script actually barfs on them). None of them appear to actually have any contents, which may or may not be why. Find_evtx-chunks.py identified a single valid chunk at offset 0x1000 in each of them.
-                                Thanks
