@@ -10,6 +10,9 @@ setuptools.setup(name="evtxtract",
       url="https://github.com/williballenthin/evtxtract",
       license="Apache 2.0 License",
       packages=setuptools.find_packages(),
+      console_scripts=[
+          'evtxtract=evtxtract.main:main',
+      ],
       install_requires=[
           'six',
           'lxml',

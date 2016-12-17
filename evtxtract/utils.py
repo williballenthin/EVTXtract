@@ -15,7 +15,7 @@ def to_lxml(record_xml):
     """
     if "<?xml" not in record_xml:
         return etree.fromstring(
-            bytes("<?xml version=\"1.0\" standalone=\"yes\" ?>%s" % record_xml, 'utf-8'))
+            "<?xml version=\"1.0\" standalone=\"yes\" ?>%s" % record_xml)
     else:
         return etree.fromstring(record_xml)
 
