@@ -6,7 +6,7 @@ import evtxtract.utils
 
 
 CD = os.path.dirname(__file__)
-IMAGE_PATH = os.path.join(CD, 'WinXP.dd')
+IMAGE_PATH = os.path.join(CD, 'joshua1.vmem')
 
 
 @pytest.fixture

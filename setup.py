@@ -11,6 +11,7 @@ setuptools.setup(name="evtxtract",
       license="Apache 2.0 License",
       packages=setuptools.find_packages(),
       install_requires=[
+          'lxml',
           'pytest',
           'python-evtx',
       ],
