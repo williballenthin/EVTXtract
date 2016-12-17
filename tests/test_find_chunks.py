@@ -105,7 +105,7 @@ def atest_extract_records(image_mmap):
     assert expected_eids == found_eids
 
 
-def test_extract_templates(image_mmap):
+def atest_extract_templates(image_mmap):
     # these template ids were empirically collected from the test image
     expected_ids = set([
         "1-[0|4|c]-[1|4|c]-[2|6|c]-[3|6|c]-[4|6|c]-[5|21|c]-[6|17|c]-[7|15|c]-[8|8|c]-[9|8|c]-[10|10|c]-[11|4|c]-[12|19|c]-[13|15|c]-[14|1|c]-[15|15|c]-[16|1|c]-[17|8|n]",
@@ -129,3 +129,10 @@ def test_extract_templates(image_mmap):
             found_ids.add(template.get_id())
 
     assert expected_ids == found_ids
+
+
+def test_find_records(image_mmap):
+    records = list(evtxtract.carvers.find_evtx_records(image_mmap))
+    assert records[0] == 0x317198
+    assert records[-1] == 0x3D706A88
+    assert len(records) == 1674
