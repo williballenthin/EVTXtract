@@ -31,8 +31,8 @@ def is_chunk_header(buf, offset):
     Implementation note: Simply checks the magic header and size field for reasonable values.
 
     Args:
-      buf (buffer):
-      offset (int):
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): the address of the potential EVTX chunk header.
 
     Returns:
       bool: if the offset appears to be an EVTX chunk header.
@@ -76,7 +76,7 @@ def find_evtx_chunks(buf):
     Scans the given data for valid EVTX chunk structures.
 
     Args:
-      buf (buffer):
+      buf (buffer): the binary data from which to extract structures.
 
     Returns:
       iterable[int]: generator of offsets of chunks
@@ -98,11 +98,11 @@ def is_record(buf, offset):
     Return True if the offset appears to be an EVTX record.
 
     Args:
-      buf (buffer):
-      offset (int):
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): the address of the potential record.
 
     Returns:
-      bool:
+      bool: if its a record.
     """
 
     if len(buf) < offset + 8:
@@ -130,7 +130,7 @@ def find_evtx_records(buf):
     Generates offsets of apparent EVTX records from the given buffer.
 
     Args:
-      buf (buffer):
+      buf (buffer): the binary data from which to extract structures.
 
     Returns:
       iterable[int]: the offsets of EVTX records.
@@ -151,11 +151,20 @@ RecoveredRecord = namedtuple('RecoveredRecord', ['offset', 'eid', 'xml'])
 
 
 def extract_chunk_records(buf, offset):
+    """
+    Generates EVTX records from the EVTX chunk at the given offset.
+
+    Args:
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): offset to EVTX chunk
+
+    Returns:
+      iterable[int]: the offsets of EVTX records.
+    """
     try:
         chunk = Evtx.Evtx.ChunkHeader(buf, offset)
     except:
-        logger.warn('failed to parse chunk header', exc_info=True)
-        return
+        raise ParseError('failed to parse chunk header')
 
     cache = {}
     for record in chunk.records():
@@ -182,11 +191,21 @@ def extract_chunk_records(buf, offset):
 
 
 def extract_chunk_templates(buf, offset):
+    """
+    Generates EVTX record templates from the EVTX chunk at the given offset.
+
+    Args:
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): offset to EVTX chunk.
+
+    Returns:
+      iterable[evtxtract.templates.Template]: a generator of the things you asked for.
+    """
+
     try:
         chunk = Evtx.Evtx.ChunkHeader(buf, offset)
     except:
-        logger.warn('failed to parse chunk header', exc_info=True)
-        return
+        raise ParseError('failed to parse chunk header')
 
     cache = {}
     for record in chunk.records():
@@ -227,10 +246,16 @@ def does_root_have_resident_template(buf, offset, max_offset):
       from the given buffer and offset, not parsing
       beyond the given max_offset.
 
-    @type buf: bytestring
-    @type offset: int
-    @type max_offset: int
-    @rtype: boolean
+    Args:
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): address of an EVTX record.
+      max_offset (int): don't parse beyond this address.
+
+    Returns:
+      boolean: if the RootNode has a resident template.
+
+    Raises:
+      MaxOffsetReached: if the given max offset was reached while parsing.
     """
     logger = logging.getLogger("extract_lost_records")
     ofs = offset
@@ -291,10 +316,16 @@ def extract_root_substitutions(buf, offset, max_offset):
     Parse a RootNode into a list of its substitutions, not parsing beyond
       the max offset.
 
-    @type buf: bytestring
-    @type offset: int
-    @type max_offset: int
-    @rtype: list of (int, str)
+    Args:
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): address of an EVTX record.
+      max_offset (int): don't parse beyond this address.
+
+    Returns:
+      list[tuple[int, variant]]: list of substitution tuples (type, value).
+
+    Raises:
+      ParseError: for various reasons, including invalid timestamps and overruns.
     """
     ofs = offset
     token = struct.unpack_from("<b", buf, ofs)[0]
@@ -494,7 +525,7 @@ def extract_root_substitutions(buf, offset, max_offset):
             subs = extract_root_substitutions(buf, ofs, max_offset)
             ret.extend(subs)
 
-        #[129] = TODO, -- WstringArrayTypeNode, 0x81
+        #[129] = WstringArrayTypeNode, 0x81
         elif type_ == 0x81:
 
             value = []
@@ -539,11 +570,14 @@ def extract_record(buf, offset):
     Parse an EVTX record into a convenient dictionary of fields.
 
     Args:
-      buf (buffer):
-      offset (int):
+      buf (buffer): the binary data from which to extract structures.
+      offset (int): address of the EVTX record.
 
     Returns:
-      ExtractedRecord:
+      ExtractedRecord: the thing you asked for.
+
+    Raises:
+      ParseError: for various reasons, including invalid timestamps and overruns.
     """
     if not is_record(buf, offset):
         raise ValueError('not a record')

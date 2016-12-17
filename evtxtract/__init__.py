@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 VALUE = 1
 
 
-
 class CompleteRecord(object):
     __slots__ = ('offset', 'eid', 'xml')
 
@@ -34,13 +33,17 @@ class IncompleteRecord(object):
 
 def extract(buf):
     '''
+    Do the EVTXtract algorithm and reconstruct EVTX records from the given data.
+
     Args:
       buf (buffer): the binary data from which to extract structures.
 
     Returns:
       iterable[union[CompleteRecord, IncompleteRecord]]: a generator of either
-        CompleteRecord or IncompleteRecord.
+        CompleteRecord or IncompleteRecord. You'll have to type-switch of these
+        classes to decide out how to handle them.
     '''
+    # this does a full scan of the file (#1)
     chunks = set(evtxtract.carvers.find_evtx_chunks(buf))
 
     valid_record_offsets = set([])
@@ -49,11 +52,14 @@ def extract(buf):
             valid_record_offsets.add(record.offset)
             yield CompleteRecord(record.offset, record.eid, record.xml)
 
+    # map from eid to dictionary mapping from templateid to template
     templates = collections.defaultdict(dict)
     for chunk in chunks:
         for template in evtxtract.carvers.extract_chunk_templates(buf, chunk):
             templates[template.eid][template.get_id()] = template
 
+    # this does a full scan of the file (#2).
+    # needs to be distinct because we must have collected all the templates first.
     for record_offset in evtxtract.carvers.find_evtx_records(buf):
         if record_offset in valid_record_offsets:
             continue
@@ -78,29 +84,11 @@ def extract(buf):
 
         if len(matching_templates) == 0:
             logger.info('no matching templates for record at offset: 0x%x', record_offset)
-
-            if eid in templates:
-                logger.debug('eid: %s', eid)
-                logger.debug('subs:')
-                for i, (type_, value) in enumerate(record.substitutions):
-                    logger.debug('    %d. %X: %s', i, type_, value)
-
             yield IncompleteRecord(record_offset, eid, record.substitutions)
             continue
 
         if len(matching_templates) > 1:
             logger.info('too many templates for record at offset: 0x%x', record_offset)
-            logger.debug('record: 0x%x', record_offset)
-            logger.debug('eid: %s', eid)
-
-            logger.debug('subs:')
-            for i, (type_, value) in enumerate(record.substitutions):
-                logger.debug('    %d. %X: %s', i, type_, value)
-
-            logger.info('templates:')
-            for template in matching_templates:
-                logger.debug('  - %s', template.get_id())
-
             yield IncompleteRecord(record_offset, eid, record.substitutions)
             continue
 

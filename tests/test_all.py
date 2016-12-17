@@ -7,11 +7,11 @@ from fixtures import *
 
 
 #logging.basicConfig(level=logging.DEBUG)
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def atest_find_chunks(image_mmap):
+def test_find_chunks(image_mmap):
     # these offsets were empirically collected from the test image
     expected = set([
         0xc7f000,
@@ -57,7 +57,7 @@ def first(s):
         return x
 
 
-def atest_extract_records(image_mmap):
+def test_extract_records(image_mmap):
     # these offsets were empirically collected from the test image
     expected_offsets = set([
         0xf0e200,
@@ -107,7 +107,7 @@ def atest_extract_records(image_mmap):
     assert expected_eids == found_eids
 
 
-def atest_extract_templates(image_mmap):
+def test_extract_templates(image_mmap):
     # these template ids were empirically collected from the test image
     expected_ids = set([
         "1-[0|4|c]-[1|4|c]-[2|6|c]-[3|6|c]-[4|6|c]-[5|21|c]-[6|17|c]-[7|15|c]-[8|8|c]-[9|8|c]-[10|10|c]-[11|4|c]-[12|19|c]-[13|15|c]-[14|1|c]-[15|15|c]-[16|1|c]-[17|8|n]",
@@ -133,7 +133,7 @@ def atest_extract_templates(image_mmap):
     assert expected_ids == found_ids
 
 
-def atest_find_records(image_mmap):
+def test_find_records(image_mmap):
     records = list(evtxtract.carvers.find_evtx_records(image_mmap))
     assert records[0] == 0x317198
     assert records[-1] == 0x3D706A88
@@ -141,6 +141,15 @@ def atest_find_records(image_mmap):
 
 
 def test_evtxtract(image_mmap):
+    num_complete = 0
+    num_incomplete = 0
     for r in evtxtract.extract(image_mmap):
-        from pprint import pprint
-        pprint(r)
+        if isinstance(r, evtxtract.CompleteRecord):
+            num_complete += 1
+        elif isinstance(r, evtxtract.IncompleteRecord):
+            num_incomplete += 1
+        else:
+            raise RuntimeError('unexpected return type')
+
+    assert num_complete == 52
+    assert num_incomplete == 1615
