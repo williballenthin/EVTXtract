@@ -58,7 +58,7 @@ def reconstruct_lost_records(state, templates, progress_class=NullProgress):
             num_unreconstructed += 1
             logger.debug("Unable to reconstruct record with EID %d: %s", eid, str(e))
             continue
-        
+
         subs = map(lambda s: (s[0], str(s[1])), lost_record["substitutions"])
         state.add_reconstructed_record(lost_record["offset"], eid, template.insert_substitutions(subs))
         num_reconstructed += 1

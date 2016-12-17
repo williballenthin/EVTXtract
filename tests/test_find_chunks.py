@@ -1,5 +1,6 @@
 import logging
 
+import evtxtract
 import evtxtract.carvers
 
 from fixtures import *
@@ -131,8 +132,13 @@ def atest_extract_templates(image_mmap):
     assert expected_ids == found_ids
 
 
-def test_find_records(image_mmap):
+def atest_find_records(image_mmap):
     records = list(evtxtract.carvers.find_evtx_records(image_mmap))
     assert records[0] == 0x317198
     assert records[-1] == 0x3D706A88
     assert len(records) == 1674
+
+
+def test_evtxtract(image_mmap):
+    for r in evtxtract.extract(image_mmap):
+        pprint(r)
