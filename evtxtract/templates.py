@@ -155,7 +155,11 @@ class Template(object):
         for index, pair in enumerate(substitutions):
             type_, value = pair
             from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-            ret = re.sub(from_pattern, Template._escape(value), ret)
+            if isstr(value):
+                value = Template._escape(value)
+            else:
+                value = str(value)
+            ret = re.sub(from_pattern, value, ret)
         return ret
 
 

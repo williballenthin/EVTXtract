@@ -22,6 +22,9 @@ MIN_CHUNK_HEADER_SIZE = 0x80
 MAX_CHUNK_HEADER_SIZE = 0x200
 
 
+class ParseError(RuntimeError): pass
+
+
 def is_chunk_header(buf, offset):
     """
     Return True if the offset appears to be an EVTX Chunk header.
@@ -316,8 +319,8 @@ def extract_root_substitutions(buf, offset, max_offset):
 
     num_subs = struct.unpack_from("<I", buf, ofs)[0]
     if num_subs > 100:
-        raise RuntimeError("Unexpected number of substitutions: %d at %s" %
-                           (num_subs, hex(ofs)))
+        raise ParseError("Unexpected number of substitutions: %d at %s" %
+                         (num_subs, hex(ofs)))
 
     ofs += 4  # begin sub list
 
@@ -325,7 +328,7 @@ def extract_root_substitutions(buf, offset, max_offset):
     for _ in range(num_subs):
         size, type_ = struct.unpack_from("<HB", buf, ofs)
         if not VALID_SUBSTITUTION_TYPES[type_]:
-            raise RuntimeError('Unexpected substitution type: ' + hex(type_))
+            raise ParseError('Unexpected substitution type: ' + hex(type_))
 
         substitutions.append((type_, size))
         ofs += 4
@@ -435,14 +438,18 @@ def extract_root_substitutions(buf, offset, max_offset):
             elif size == 0x8:
                 value = struct.unpack_from("<Q", buf, ofs)[0]
             else:
-                raise RuntimeError('unexpected sizetypenode value: ' + hex(size))
+                raise ParseError('unexpected sizetypenode value: ' + hex(size))
 
             ret.append((type_, value))
 
         #[17] = parse_filetime_type_node,
         elif type_ == 0x11:
             qword = struct.unpack_from("<Q", buf, ofs)[0]
-            value = datetime.datetime.utcfromtimestamp(float(qword) * 1e-7 - 11644473600)
+            try:
+                value = datetime.datetime.utcfromtimestamp(float(qword) * 1e-7 - 11644473600)
+            except ValueError:
+                raise ParseError('invalid timestamp')
+
             ret.append((type_, value))
 
         #[18] = parse_systemtime_type_node,
@@ -518,7 +525,7 @@ def extract_root_substitutions(buf, offset, max_offset):
             ret.append((type_, value))
 
         else:
-            raise RuntimeError("Unexpected type encountered: " + hex(type_))
+            raise ParseError("Unexpected type encountered: " + hex(type_))
 
         ofs += size
     return ret
@@ -539,11 +546,14 @@ def extract_record(buf, offset):
       ExtractedRecord:
     """
     if not is_record(buf, offset):
-        raise RuntimeError('not a record')
+        raise ValueError('not a record')
 
     record_size, record_num, qword = struct.unpack_from("<IQQ", buf, offset + 0x4)
     timestamp = datetime.datetime.utcfromtimestamp(float(qword) * 1e-7 - 11644473600)
     root_offset = offset + 0x18
-    substitutions = extract_root_substitutions(buf, root_offset, offset + record_size)
+    try:
+        substitutions = extract_root_substitutions(buf, root_offset, offset + record_size)
+    except struct.error:
+        raise ParseError('buffer overrun')
 
     return ExtractedRecord(offset, record_num, timestamp, substitutions)

@@ -7,6 +7,7 @@ from fixtures import *
 
 
 #logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -141,4 +142,5 @@ def atest_find_records(image_mmap):
 
 def test_evtxtract(image_mmap):
     for r in evtxtract.extract(image_mmap):
+        from pprint import pprint
         pprint(r)
