@@ -15,6 +15,19 @@ Now the tool is ready to go!
     C:/Python27/Scripts/evtxtract.exe   Z:/evidence/1/image.dd   >   Z:/work/1/evtx.xml
 
 
+Quicker Run
+-----------
+
+Download standalone executable nightly builds of EVTXtract here:
+
+  - [Linux](https://s3.amazonaws.com/build-artifacts.floss.flare.fireeye.com/travis/linux/dist/evtxtract)
+  - [MacOS](https://s3.amazonaws.com/build-artifacts.floss.flare.fireeye.com/travis/osx/dist/evtxtract)
+
+Then you can do:
+
+    ./evtxtract    /path/to/evidence    >   /path/to/output.xml
+
+
 Background
 ----------
 
