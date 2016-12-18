@@ -1,3 +1,4 @@
+import os
 import sys
 import logging
 
@@ -60,7 +61,7 @@ def main(argv=None):
                 num_complete += 1
 
                 try:
-                    print(r.xml)
+                    os.write(sys.stdout.fileno(), r.xml.encode('utf-8'))
                 except Exception as e:
                     logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
 
@@ -68,7 +69,7 @@ def main(argv=None):
                 num_incomplete += 1
 
                 try:
-                    print(format_incomplete_record(r))
+                    os.write(sys.stdout.fileno(), r.xml.encode('utf-8'))
                 except Exception as e:
                     logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
 
