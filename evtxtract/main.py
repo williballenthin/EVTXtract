@@ -59,12 +59,19 @@ def main(argv=None):
             if isinstance(r, evtxtract.CompleteRecord):
                 num_complete += 1
 
-                print(r.xml)
+                try:
+                    print(r.xml)
+                except Exception as e:
+                    logger.warn('failed to output record at offset: 0x%x: %s', r.ofset, str(e))
 
             elif isinstance(r, evtxtract.IncompleteRecord):
                 num_incomplete += 1
 
-                print(format_incomplete_record(r))
+                try:
+                    print(format_incomplete_record(r))
+                except Exception as e:
+                    logger.warn('failed to output record at offset: 0x%x: %s', r.ofset, str(e))
+
             else:
                 raise RuntimeError('unexpected return type')
 
