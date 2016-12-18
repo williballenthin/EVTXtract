@@ -2,6 +2,7 @@ import re
 import sys
 import logging
 
+import six
 import Evtx.Evtx
 import Evtx.Nodes
 import Evtx.Views
@@ -11,23 +12,6 @@ import evtxtract.templates
 
 
 logger = logging.getLogger(__name__)
-
-
-# via: https://github.com/vivisect/synapse/blob/master/synapse/compat.py
-major = sys.version_info.major
-minor = sys.version_info.minor
-micro = sys.version_info.micro
-
-majmin = (major,minor)
-version = (major,minor,micro)
-
-
-if version < (3,0,0):
-    def isstr(s):
-        return type(s) in (str,unicode)
-else:
-    def isstr(s):
-        return type(s) == str
 
 
 class Template(object):
@@ -155,7 +139,7 @@ class Template(object):
         for index, pair in enumerate(substitutions):
             type_, value = pair
             from_pattern = "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % index
-            if isstr(value):
+            if isinstance(value, six.string_types):
                 value = Template._escape(value)
             else:
                 value = str(value)
@@ -226,7 +210,7 @@ def get_complete_template(root, current_index=0):
             from_pattern = "index=%d," % index
             to_pattern = "index=%d," % replacement
             template = template.replace(from_pattern, to_pattern)
-        if isstr(replacement):
+        if isinstance(replacement, six.string_types):
             # insert sub-template
             template = make_replacement(template, index, replacement)
     return template
