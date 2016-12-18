@@ -148,8 +148,9 @@ class Template(object):
 
 
 REPLACEMENT_PATTERNS = {
-        i: re.compile("\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % i) 
-          for i in range(35)}
+    i: re.compile(
+        "\[(Normal|Conditional) Substitution\(index=%d, type=\d+\)\]" % i)
+    for i in range(35)}
 
 
 def make_replacement(template, index, substitution):

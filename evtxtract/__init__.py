@@ -59,7 +59,8 @@ def extract(buf):
             templates[template.eid][template.get_id()] = template
 
     # this does a full scan of the file (#2).
-    # needs to be distinct because we must have collected all the templates first.
+    # needs to be distinct because we must have collected all the templates
+    # first.
     for record_offset in evtxtract.carvers.find_evtx_records(buf):
         if record_offset in valid_record_offsets:
             continue

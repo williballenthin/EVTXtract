@@ -43,13 +43,18 @@ def get_eid(record_xml):
     Returns:
       int: the event ID of the record
     """
-    return int(get_child(get_child(to_lxml(record_xml), "System"), "EventID").text)
+    return int(
+        get_child(
+            get_child(to_lxml(record_xml),
+                      "System"),
+            "EventID").text)
 
 
 class Mmap(object):
     """
     Convenience class for opening a read-only memory map for a file path.
     """
+
     def __init__(self, filename):
         super(Mmap, self).__init__()
         self._filename = filename
@@ -64,5 +69,3 @@ class Mmap(object):
     def __exit__(self, type, value, traceback):
         self._mmap.close()
         self._f.close()
-
-

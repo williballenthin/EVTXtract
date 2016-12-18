@@ -35,7 +35,8 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv[1:]
 
-    parser = argparse.ArgumentParser(description="Reconstruct EVTX event log records from binary data.")
+    parser = argparse.ArgumentParser(
+        description="Reconstruct EVTX event log records from binary data.")
     parser.add_argument("input", type=str,
                         help="Path to binary input file")
     parser.add_argument("-v", "--verbose", action="store_true",

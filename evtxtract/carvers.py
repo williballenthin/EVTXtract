@@ -487,7 +487,7 @@ def extract_root_substitutions(buf, offset, max_offset):
         elif type_ == 0x12:
             parts = struct.unpack_from("<WWWWWWWW", buf, ofs)
             value = datetime.datetime(parts[0], parts[1],
-                                      parts[3], # skip part 2 (day of week)
+                                      parts[3],  # skip part 2 (day of week)
                                       parts[4], parts[5],
                                       parts[6], parts[7])
             ret.append((type_, value))
@@ -562,7 +562,8 @@ def extract_root_substitutions(buf, offset, max_offset):
     return ret
 
 
-ExtractedRecord = namedtuple('ExtractedRecord', ['offset', 'num', 'timestamp', 'substitutions'])
+ExtractedRecord = namedtuple(
+    'ExtractedRecord', ['offset', 'num', 'timestamp', 'substitutions'])
 
 
 def extract_record(buf, offset):
