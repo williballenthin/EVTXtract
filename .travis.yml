@@ -34,7 +34,7 @@ install:
     - pip install pyinstaller pep8
     - echo "__version__ = '$(git describe --tags)'" > evtxtract/version.py
     - pip install -e .
-    - pyinstaller evtxtract.spec
+    - pyinstaller evtxtract.spec && rm -r './dist/evtxtract-dat/'
 
 script:
     - find . -name \*.py -exec pep8 --ignore=E501 {} \;
