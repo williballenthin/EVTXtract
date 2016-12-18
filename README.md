@@ -53,36 +53,38 @@ Usage
 
 The EVTXtract is a pure Python script.
 This means it easily runs on Windows, Linux, and MacOS.
-Simply invoke the script, providing the path to a binary image, and EVTXtract writes its results to STDOUT.
-The binary image can be any data: a raw image, memory dump, etc.
+Simply invoke the script, providing the path to a binary image, and EVTXtract writes its results to the standard out stream.
+The binary file can be any data: a raw image, memory dump, etc.
 
 Example command line:
 
     C:/Python27/Scripts/evtxtract.exe   Z:/evidence/1/image.dd   >   Z:/work/1/evtx.xml
 
-And below are some example results from the above command.
+Below are some example results from the above command.
 It shows two records: a complete and incomplete record.
 The first record is completely reconstructed,
   and is formatted just like it would be in event viewer.
-EVTXtract was unable to complete reconstruct the second record,
- since some critical template data was missing,
- so its been formatted with as much data as was recovered.
-Its schema allows you to continue to processing despite incomplete data.
+However, EVTXtract was unable to complete reconstruct the second record,
+ since some critical template data was missing.
+So, its been formatted with as much data as was recovered.
+EVTXtract uses a schema that allows you to continue processing despite incomplete data.
 
-    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-PrintService" Guid="{747ef6fd-e535-4d16-b510-42c90f6873a1}"></Provider>
-        <EventID Qualifiers="">823</EventID>
-        <Version>0</Version>
-        <Level>4</Level>
-        <Task>49</Task>
-        <Opcode>11</Opcode>
-        <Keywords>0x80000000000200</Keywords>
-        <TimeCreated SystemTime="2013-03-23 02:05:57.848455"></TimeCreated>
-        <EventRecordID>1</EventRecordID>
-        <Correlation ActivityID="" RelatedActivityID=""></Correlation>
-        <Execution ProcessID="1204" ThreadID="1208"></Execution>
-        <Channel>Microsoft-Windows-PrintService/Admin</Channel>
-        <Computer>JOSHUA</Computer>
-        <Security UserID="S-1-5-21-3454551831-629247693-1078506759-1000"></Security>
+    <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+            <Provider Name="Microsoft-Windows-PrintService" Guid="{747ef6fd-e535-4d16-b510-42c90f6873a1}"></Provider>
+            <EventID Qualifiers="">823</EventID>
+            <Version>0</Version>
+            <Level>4</Level>
+            <Task>49</Task>
+            <Opcode>11</Opcode>
+            <Keywords>0x80000000000200</Keywords>
+            <TimeCreated SystemTime="2013-03-23 02:05:57.848455"></TimeCreated>
+            <EventRecordID>1</EventRecordID>
+            <Correlation ActivityID="" RelatedActivityID=""></Correlation>
+            <Execution ProcessID="1204" ThreadID="1208"></Execution>
+            <Channel>Microsoft-Windows-PrintService/Admin</Channel>
+            <Computer>JOSHUA</Computer>
+            <Security UserID="S-1-5-21-3454551831-629247693-1078506759-1000"></Security>
         </System>
         <UserData>
             <ChangingDefaultPrinter xmlns:auto-ns3="http://schemas.microsoft.com/win/2004/08/events" xmlns="http://manifests.microsoft.com/win/2005/08/windows/printing/spooler/core/events">
