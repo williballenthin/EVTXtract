@@ -4,7 +4,7 @@ block_cipher = None
 
 a = Analysis(
     ['evtxtract/main.py'],
-     pathex=['floss'],
+     pathex=['evtxtract'],
      binaries=None,
      datas=None,
      hiddenimports=[],
