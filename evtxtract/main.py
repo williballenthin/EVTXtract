@@ -62,7 +62,7 @@ def main(argv=None):
                 try:
                     print(r.xml)
                 except Exception as e:
-                    logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e))
+                    logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
 
             elif isinstance(r, evtxtract.IncompleteRecord):
                 num_incomplete += 1
@@ -70,7 +70,7 @@ def main(argv=None):
                 try:
                     print(format_incomplete_record(r))
                 except Exception as e:
-                    logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e))
+                    logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
 
             else:
                 raise RuntimeError('unexpected return type')

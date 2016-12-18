@@ -1,7 +1,9 @@
 import re
 import struct
 import logging
+import binascii
 import datetime
+import xml.sax.saxutils
 from collections import namedtuple
 
 import six
@@ -379,13 +381,17 @@ def extract_root_substitutions(buf, offset, max_offset):
         #[1] = parse_wstring_type_node,
         elif type_ == 0x1:
             s = buf[ofs:ofs + size]
-            value = s.decode("utf-16le").replace("<", "&gt;").replace(">", "&lt;")
+            s = s.decode('utf-16le')
+            s = xml.sax.saxutils.escape(s)
+            value = s
             ret.append((type_, value))
 
         #[2] = parse_string_type_node,
         elif type_ == 0x2:
             s = buf[ofs:ofs + size]
-            value = s.decode("utf-8").replace("<", "&gt;").replace(">", "&lt;")
+            s = s.decode('ascii')
+            s = xml.sax.saxutils.escape(s)
+            value = s
             ret.append((type_, value))
 
         #[3] = parse_signed_byte_type_node,
@@ -445,7 +451,7 @@ def extract_root_substitutions(buf, offset, max_offset):
 
         #[14] = parse_binary_type_node,
         elif type_ == 0xE:
-            value = buf[ofs:ofs + size].encode('hex')
+            value = binascii.hexlify(buf[ofs:ofs + size])
             ret.append((type_, value))
 
         #[15] = parse_guid_type_node,
@@ -535,7 +541,9 @@ def extract_root_substitutions(buf, offset, max_offset):
                 match = re.search(b"((?:[^\x00].)+)", bin)
                 if match:
                     frag = match.group()
-                    value.append(frag.decode("utf-16"))
+                    s = frag.decode("utf-16")
+                    s = xml.sax.saxutils.escape(s)
+                    value.append(s)
                     bin = bin[len(frag) + 2:]
                     if len(bin) == 0:
                         break
@@ -546,7 +554,7 @@ def extract_root_substitutions(buf, offset, max_offset):
                         value.append('')
 
                 else:
-                    raise ParseException("Error parsing uneven substring of NULLs")
+                    raise ParseError("Error parsing uneven substring of NULLs")
 
                 bin = bin[len(frag):]
 
