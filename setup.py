@@ -17,6 +17,6 @@ setuptools.setup(name="evtxtract",
           'six',
           'lxml',
           'pytest',
-          'python-evtx',
+          'python-evtx>0.5.2',
       ],
 )
