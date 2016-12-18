@@ -445,7 +445,7 @@ def extract_root_substitutions(buf, offset, max_offset):
 
         #[14] = parse_binary_type_node,
         elif type_ == 0xE:
-            value = buf[ofs:ofs + size]
+            value = buf[ofs:ofs + size].encode('hex')
             ret.append((type_, value))
 
         #[15] = parse_guid_type_node,
