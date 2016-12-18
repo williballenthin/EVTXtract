@@ -38,7 +38,7 @@ install:
 
 script:
     - find . -name \*.py -exec pep8 --ignore=E501 {} \;
-    - pushd ./tests && wget "https://dl.dropboxusercontent.com/u/55819714/joshua1.zip" -O ./tests/joshua1/zip && unzip joshua1.zip && popd
+    - pushd ./tests && wget "https://dl.dropboxusercontent.com/u/55819714/joshua1.zip" -O ./tests/joshua1.zip && unzip joshua1.zip && popd
     - py.test tests/ -v
 
 addons:
