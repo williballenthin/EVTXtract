@@ -1,9 +1,17 @@
 #!/usr/bin/env python
 
+import os
 import setuptools
 
+
+# this sets __version__
+# # via: http://stackoverflow.com/a/7071358/87207
+# # and: http://stackoverflow.com/a/2073599/87207
+with open(os.path.join("evtxtract", "version.py"), "rb") as f:
+     exec(f.read())
+
 setuptools.setup(name="evtxtract",
-      version="0.2",
+      version=__version__,
       description="EVTXtract recovers and reconstructs fragments of EVTX log files from raw binary data, including unallocated space and memory images.",
       author="Willi Ballenthin",
       author_email="william.ballenthin@fireeye.com",
@@ -17,6 +25,6 @@ setuptools.setup(name="evtxtract",
           'six',
           'lxml',
           'pytest',
-          'python-evtx>0.5.2',
+          'python-evtx>~0.5.2',
       ],
 )
