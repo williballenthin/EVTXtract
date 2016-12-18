@@ -56,6 +56,9 @@ def main(argv=None):
     with evtxtract.utils.Mmap(args.input) as mm:
         num_complete = 0
         num_incomplete = 0
+
+        print('<?xml version="1.0" encoding="UTF-8"?>')
+        print('<evtxtract>')
         for r in evtxtract.extract(mm):
             if isinstance(r, evtxtract.CompleteRecord):
                 num_complete += 1
@@ -75,6 +78,7 @@ def main(argv=None):
 
             else:
                 raise RuntimeError('unexpected return type')
+        print('</evtxtract>')
 
         logging.info('recovered %d complete records', num_complete)
         logging.info('recovered %d incomplete records', num_incomplete)
