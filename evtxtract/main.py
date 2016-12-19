@@ -72,7 +72,7 @@ def main(argv=None):
                 num_incomplete += 1
 
                 try:
-                    os.write(sys.stdout.fileno(), r.xml.encode('utf-8'))
+                    os.write(sys.stdout.fileno(), format_incomplete_record(r).encode('utf-8'))
                 except Exception as e:
                     logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
 
