@@ -70,6 +70,12 @@ def extract(buf):
         except evtxtract.carvers.ParseError as e:
             logger.info('parse error for record at offset: 0x%x: %s', record_offset, str(e))
             continue
+        except ValueError as e:
+            logger.info('timestamp parse error for record at offset: 0x%x: %s', record_offset, str(e))
+            continue
+        except Exception as e:
+            logger.info('unknown parse error for record at offset: 0x%x: %s', record_offset, str(e))
+            continue
 
         if len(record.substitutions) < 4:
             logger.info('too few substitutions for record at offset: 0x%x', record_offset)
