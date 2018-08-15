@@ -67,5 +67,7 @@ class Mmap(object):
         return self._mmap
 
     def __exit__(self, type, value, traceback):
-        self._mmap.close()
-        self._f.close()
+        if self._mmap:
+            self._mmap.close()
+        if  self._f :
+            self._f.close()
