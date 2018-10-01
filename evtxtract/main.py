@@ -78,7 +78,8 @@ def main(argv=None):
 
             else:
                 raise RuntimeError('unexpected return type')
-        print('</evtxtract>')
+        os.write(sys.stdout.fileno(), '</evtxtract>'.encode('utf-8'))
+        sys.stdout.flush()
 
         logging.info('recovered %d complete records', num_complete)
         logging.info('recovered %d incomplete records', num_incomplete)
