@@ -67,6 +67,8 @@ def main(argv=None):
                     os.write(sys.stdout.fileno(), r.xml.encode('utf-8'))
                 except Exception as e:
                     logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
+                else:
+                    sys.stdout.flush()
 
             elif isinstance(r, evtxtract.IncompleteRecord):
                 num_incomplete += 1
@@ -75,11 +77,12 @@ def main(argv=None):
                     os.write(sys.stdout.fileno(), format_incomplete_record(r).encode('utf-8'))
                 except Exception as e:
                     logger.warn('failed to output record at offset: 0x%x: %s', r.offset, str(e), exc_info=True)
+                else:
+                    sys.stdout.flush()
 
             else:
                 raise RuntimeError('unexpected return type')
-        os.write(sys.stdout.fileno(), '</evtxtract>'.encode('utf-8'))
-        sys.stdout.flush()
+        print('</evtxtract>')
 
         logging.info('recovered %d complete records', num_complete)
         logging.info('recovered %d incomplete records', num_incomplete)
